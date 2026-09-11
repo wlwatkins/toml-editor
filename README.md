@@ -131,6 +131,10 @@ and blocks saving, so the file never receives something that will not parse.
 The **Raw** tab shows the exact text that Save will write, which is worth a
 glance before committing to a change.
 
+**Close** (or File -> Close file, or Ctrl+W) puts the editor back to its empty
+state. With unsaved changes it asks first, naming how many would be lost; the
+path stays in the location bar so the file is one click away again.
+
 ## Comments
 
 Comments are rendered as Markdown, because that is how people already write

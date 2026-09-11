@@ -115,6 +115,17 @@ export class Editor {
 		this.status = null;
 	}
 
+	/** Puts the editor back to its empty state, discarding any pending edits. */
+	close() {
+		this.doc = null;
+		this.openPath = '';
+		this.mtimeMs = 0;
+		this.scalars = {};
+		this.arrays = {};
+		this.parseError = null;
+		this.status = null;
+	}
+
 	/** Loads a document straight from text, with no file behind it. */
 	loadText(label: string, text: string) {
 		this.scalars = {};

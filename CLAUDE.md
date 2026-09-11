@@ -139,6 +139,18 @@ not discarded -- it lands in `detachedComments` on the following entry or table.
 A detached block above the first key of the root table is hoisted onto the root
 table itself, because that is a file banner rather than a note about that key.
 
+## Destructive actions ask first
+
+`closeFile()` in +page.svelte checks `editor.dirty` and goes through
+`platform.confirm()` before discarding. That is a native message box over IPC in
+the desktop app and `window.confirm` in a browser. Anything else that can drop
+pending edits should do the same -- `editor.close()` itself is deliberately
+unguarded so the guard lives in one place, at the UI.
+
+Note the native message box does NOT use the `title` option as its window
+caption on Windows; the caption is the app name and `message` is the prominent
+line. Put the real question in `message`, not `title`.
+
 ## Focus rings in the chrome
 
 An outline is painted **outside** the element, so the global

@@ -3,7 +3,14 @@
 	import { Editor } from '$lib/editor.svelte';
 	import SectionCard from '$lib/components/SectionCard.svelte';
 	import { prefs, type CommentMode } from '$lib/prefs.svelte';
-	import { initialFile, isDesktop, onMenu, pickFile, windowCommand } from '$lib/platform';
+	import {
+		ask,
+		initialFile,
+		isDesktop,
+		onMenu,
+		pickFile,
+		windowCommand
+	} from '$lib/platform';
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
 
@@ -55,10 +62,17 @@
 		})();
 
 		onMenu((action) => {
+			// A second launch with a file hands it over rather than starting a
+			// second window; see the single-instance lock in electron/main.cjs.
+			if (action.startsWith('open-file:')) {
+				editor.open(action.slice('open-file:'.length));
+				return;
+			}
 			if (action === 'open') browse();
 			else if (action === 'save') editor.save();
 			else if (action === 'reload') editor.reload();
 			else if (action === 'revert') editor.revert();
+			else if (action === 'close') closeFile();
 		});
 	});
 
@@ -69,6 +83,31 @@
 		window.addEventListener('beforeunload', handler);
 		return () => window.removeEventListener('beforeunload', handler);
 	});
+
+	async function closeFile() {
+		if (!editor.doc) return;
+
+		if (editor.dirty) {
+			const changes = `${editor.changeCount} change${editor.changeCount === 1 ? '' : 's'}`;
+			const choice = await ask({
+				message: 'Save changes before closing?',
+				detail: `${changes} to ${editor.openPath}`,
+				buttons: ['Save', "Don't save", 'Cancel'],
+				defaultId: 0,
+				cancelId: 2
+			});
+
+			if (choice === 2 || choice < 0) return;
+			if (choice === 0) {
+				await editor.save();
+				// A failed save leaves the changes pending; staying open is the only
+				// safe answer, and the error is already on screen.
+				if (editor.dirty) return;
+			}
+		}
+
+		editor.close();
+	}
 
 	const desktop = isDesktop();
 
@@ -87,6 +126,7 @@
 					enabled: !!editor.openPath
 				},
 				{ label: 'Discard changes', action: () => editor.revert(), enabled: editor.dirty },
+				{ label: 'Close file', hint: 'Ctrl+W', action: closeFile, enabled: !!editor.doc },
 				'separator' as const,
 				{ label: 'Exit', hint: 'Alt+F4', action: () => windowCommand('quit') }
 			]
@@ -138,6 +178,9 @@
 		if (mod && event.key.toLowerCase() === 'o') {
 			event.preventDefault();
 			browse();
+		} else if (mod && event.key.toLowerCase() === 'w') {
+			event.preventDefault();
+			closeFile();
 		} else if (mod && event.key.toLowerCase() === 'r') {
 			event.preventDefault();
 			editor.reload();
@@ -226,6 +269,7 @@
 				<button type="button" class="ghost" onclick={() => editor.reload()} disabled={editor.busy}
 					>Reload</button
 				>
+				<button type="button" class="ghost" onclick={closeFile} disabled={editor.busy}>Close</button>
 			{/if}
 			<button type="button" class="primary" onclick={() => editor.save()} disabled={!editor.canSave}>
 				Save

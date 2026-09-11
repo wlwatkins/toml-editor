@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('tomlEditor', {
 	pickFile: (dir) => ipcRenderer.invoke('toml:pick', dir),
 	initialFile: () => ipcRenderer.invoke('toml:initial'),
 	appInfo: () => ipcRenderer.invoke('app:info'),
+	ask: (options) => ipcRenderer.invoke('app:ask', options),
 	onMenu: (handler) => {
 		ipcRenderer.on('menu', (_event, action) => handler(action));
 	},

@@ -123,6 +123,23 @@ handle('toml:pick', async (startDir) => {
 	return { cancelled: false, path: result.filePaths[0] };
 });
 
+handle('app:ask', async (options) => {
+	const buttons = (options && options.buttons) || ['OK', 'Cancel'];
+	const result = await dialog.showMessageBox(mainWindow, {
+		type: (options && options.type) || 'question',
+		// On Windows the caption is the app name, not this; `message` is the
+		// prominent line, so that is where the actual question belongs.
+		title: (options && options.title) || '',
+		message: (options && options.message) || '',
+		detail: (options && options.detail) || '',
+		buttons,
+		defaultId: (options && options.defaultId) ?? 0,
+		cancelId: (options && options.cancelId) ?? buttons.length - 1,
+		noLink: true
+	});
+	return { response: result.response };
+});
+
 ipcMain.handle('app:info', () => ({
 	version: app.getVersion(),
 	electron: process.versions.electron,

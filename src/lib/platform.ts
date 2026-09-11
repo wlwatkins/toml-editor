@@ -33,10 +33,21 @@ interface DesktopBridge {
 	pickFile(dir: string): Promise<Result<PickResult>>;
 	initialFile(): Promise<string | null>;
 	appInfo(): Promise<AppInfo>;
+	ask(options: AskOptions): Promise<Result<{ response: number }>>;
 	onMenu(handler: (action: string) => void): void;
 	windowState(): Promise<WindowState>;
 	windowCommand(command: WindowCommand): void;
 	onWindowState(handler: (state: WindowState) => void): void;
+}
+
+export interface AskOptions {
+	/** The question itself. This is the prominent line in the dialog. */
+	message: string;
+	detail?: string;
+	buttons: string[];
+	defaultId?: number;
+	/** Index returned when the dialog is dismissed with Escape. */
+	cancelId?: number;
 }
 
 export interface AppInfo {
@@ -165,6 +176,34 @@ export async function appInfo(): Promise<AppInfo> {
 		return { ...base, ...(await desktop.appInfo()) };
 	} catch {
 		return base;
+	}
+}
+
+/**
+ * Puts a question with several answers and returns the index of the one chosen.
+ * The desktop app gets a native message box; a browser has only a two-way
+ * confirm, so the buttons are offered in order until one is accepted.
+ */
+export async function ask(options: AskOptions): Promise<number> {
+	const cancelId = options.cancelId ?? options.buttons.length - 1;
+	const desktop = bridge();
+
+	if (!desktop) {
+		for (let i = 0; i < options.buttons.length; i++) {
+			if (i === cancelId) continue;
+			const label = options.buttons[i];
+			const text = [options.message, options.detail, `OK = ${label}`]
+				.filter(Boolean)
+				.join('\n\n');
+			if (window.confirm(text)) return i;
+		}
+		return cancelId;
+	}
+
+	try {
+		return unwrap(await desktop.ask(options)).response;
+	} catch {
+		return cancelId;
 	}
 }
 
