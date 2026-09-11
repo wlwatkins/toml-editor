@@ -1,0 +1,53 @@
+# Example configuration file.
+# The second line of the file-level comment block.
+
+# The name reported in logs and metrics.
+title = "TOML Editor Demo"
+enabled = true
+# Millisecond budget for a single request.
+timeout_ms = 2_500
+ratio = 0.75
+launched = 1979-05-27T07:32:00Z
+release_date = 2024-11-02
+daily_reset = 04:30:00
+
+# Connection details for the HTTP listener.
+[server]
+host = "127.0.0.1"   # bind address
+port = 8080
+# Ports the health checker also probes.
+extra_ports = [8081, 8082, 8083]
+tls = false
+
+[server.limits]
+# Maximum concurrent in-flight requests.
+max_connections = 512
+max_body_bytes = 10_485_760
+
+# Where structured logs are written.
+[logging]
+level = "info"
+format = 'json'
+sinks = [
+  "stdout",
+  "file",
+]
+banner = """
+Multi-line values are supported.
+They keep their line breaks."""
+
+[database]
+url = "postgres://localhost:5432/app"
+pool = { min = 2, max = 16 }
+replicas = ["replica-a", "replica-b"]
+
+# Each product below becomes its own section.
+[[products]]
+name = "Hammer"
+sku = 738594937
+in_stock = true
+
+[[products]]
+name = "Nail"
+sku = 284758393
+in_stock = false

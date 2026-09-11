@@ -1,0 +1,91 @@
+{
+	"name": "toml-editor",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"electron": "npm run build && electron .",
+		"dist": "npm run build && node scripts/package.mjs",
+		"dist:dir": "npm run build && node scripts/package.mjs --dir",
+		"preview": "vite preview",
+		"test": "npm run test:toml && npm run test:md",
+		"test:toml": "node --experimental-strip-types --no-warnings scripts/toml-roundtrip-test.ts",
+		"test:md": "node --experimental-strip-types --no-warnings scripts/markdown-test.ts",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/kit": "^2.63.0",
+		"@sveltejs/vite-plugin-svelte": "^7.1.2",
+		"@types/node": "^22.20.2",
+		"electron": "^44.3.0",
+		"electron-builder": "^26.15.3",
+		"svelte": "^5.56.1",
+		"svelte-check": "^4.6.0",
+		"typescript": "^6.0.3",
+		"vite": "^8.0.16"
+	},
+	"allowScripts": {
+		"electron-winstaller@5.4.0": true
+	},
+	"description": "Edit a TOML file on your machine as a form, without losing its comments.",
+	"main": "electron/main.cjs",
+	"build": {
+		"appId": "dev.watkins.toml-editor",
+		"productName": "TOML Editor",
+		"copyright": "Copyright (c) 2026",
+		"directories": {
+			"output": "release",
+			"buildResources": "build-resources"
+		},
+		"files": [
+			"build/**/*",
+			"electron/**/*",
+			"package.json"
+		],
+		"win": {
+			"target": [
+				{
+					"target": "nsis",
+					"arch": [
+						"x64"
+					]
+				}
+			],
+			"artifactName": "${productName} Setup ${version}.${ext}"
+		},
+		"nsis": {
+			"oneClick": false,
+			"perMachine": false,
+			"allowToChangeInstallationDirectory": true,
+			"createDesktopShortcut": true,
+			"createStartMenuShortcut": true,
+			"shortcutName": "TOML Editor"
+		},
+		"fileAssociations": [
+			{
+				"ext": "toml",
+				"name": "TOML configuration",
+				"role": "Editor"
+			}
+		],
+		"linux": {
+			"target": [
+				"AppImage"
+			],
+			"category": "Development"
+		},
+		"mac": {
+			"target": [
+				"dmg"
+			],
+			"category": "public.app-category.developer-tools"
+		}
+	},
+	"author": "Watkins"
+}

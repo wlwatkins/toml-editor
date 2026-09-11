@@ -1,0 +1,321 @@
+/*
+ * Six candidate looks for the editor.
+ *
+ * Each block only redefines the design tokens the components already consume,
+ * so a theme can be previewed -- and later adopted -- without touching any
+ * component. `.themed` is the wrapper the tokens are scoped to; the decorative
+ * layers (scanlines, grids, bloom) hang off its ::before/::after so nothing has
+ * to reach inside a component's scoped styles.
+ */
+
+.themed {
+	position: relative;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--sans);
+	isolation: isolate;
+}
+
+.themed::before,
+.themed::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 0;
+}
+
+.themed > * {
+	position: relative;
+	z-index: 1;
+}
+
+/* ---------------------------------------------------------------- Nostromo */
+
+[data-theme='nostromo'] {
+	--sans: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+	--mono: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+
+	--bg: #0a0805;
+	--surface: #130f08;
+	--surface-sunken: #0c0a06;
+	--surface-hover: #1d1609;
+	--input-bg: #0a0805;
+	--fg: #ffb000;
+	--fg-muted: #c08300;
+	--fg-faint: #7d5500;
+
+	--border: #4a3100;
+	--border-faint: #2b1d00;
+	--border-strong: #6b4700;
+
+	--accent: #ffd166;
+	--accent-soft: rgb(255 176 0 / 0.22);
+	--accent-fg: #0a0805;
+
+	--danger: #ff5c3a;
+	--success: #9dff3a;
+	--edited: #ffe08a;
+	--edited-bg: rgb(255 176 0 / 0.12);
+
+	--comment: #8a6000;
+	--comment-rule: #4a3100;
+	--badge-bg: #241900;
+	--badge-fg: #c08300;
+
+	--radius-panel: 0px;
+	--radius-control: 0px;
+	--panel-shadow: inset 0 0 0 1px rgb(255 176 0 / 0.08);
+
+	text-shadow: 0 0 6px rgb(255 176 0 / 0.35);
+}
+
+/* Rolling scanlines, plus the soft bloom of a curved tube. */
+[data-theme='nostromo']::before {
+	background: repeating-linear-gradient(
+		to bottom,
+		rgb(255 176 0 / 0.05) 0px,
+		rgb(255 176 0 / 0.05) 1px,
+		transparent 1px,
+		transparent 3px
+	);
+}
+
+[data-theme='nostromo']::after {
+	background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgb(0 0 0 / 0.55) 100%);
+}
+
+/* -------------------------------------------------------------------- Grid */
+
+[data-theme='grid'] {
+	--sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+	--mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+	--bg: #000208;
+	--surface: rgb(6 18 26 / 0.86);
+	--surface-sunken: rgb(3 10 16 / 0.9);
+	--surface-hover: rgb(12 38 52 / 0.9);
+	--input-bg: rgb(0 12 20 / 0.85);
+	--fg: #d6fbff;
+	--fg-muted: #6fb9cc;
+	--fg-faint: #5c9aab;
+
+	--border: rgb(34 224 255 / 0.28);
+	--border-faint: rgb(34 224 255 / 0.12);
+	--border-strong: rgb(34 224 255 / 0.55);
+
+	--accent: #22e0ff;
+	--accent-soft: rgb(34 224 255 / 0.25);
+	--accent-fg: #001016;
+
+	--danger: #ff4d6d;
+	--success: #4dffa6;
+	--edited: #ffd447;
+	--edited-bg: rgb(255 212 71 / 0.1);
+
+	--comment: #4f94a6;
+	--comment-rule: rgb(34 224 255 / 0.35);
+	--badge-bg: rgb(34 224 255 / 0.12);
+	--badge-fg: #7fd9ea;
+
+	--radius-panel: 2px;
+	--radius-control: 2px;
+	--panel-shadow:
+		0 0 0 1px rgb(34 224 255 / 0.18),
+		0 0 24px rgb(34 224 255 / 0.09);
+}
+
+/* The floor grid, receding toward a horizon. */
+[data-theme='grid']::before {
+	background-image:
+		linear-gradient(rgb(34 224 255 / 0.07) 1px, transparent 1px),
+		linear-gradient(90deg, rgb(34 224 255 / 0.07) 1px, transparent 1px);
+	background-size: 44px 44px;
+}
+
+[data-theme='grid']::after {
+	background: radial-gradient(ellipse at 50% 0%, rgb(34 224 255 / 0.1), transparent 60%);
+}
+
+/* -------------------------------------------------------------- FlightDeck */
+
+[data-theme='flightdeck'] {
+	--sans: 'Segoe UI Semibold', 'Segoe UI', system-ui, sans-serif;
+	--mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+	--bg: #060b16;
+	--surface: #101a2e;
+	--surface-sunken: #0a1222;
+	--surface-hover: #1a2842;
+	--input-bg: #0a1222;
+	--fg: #e8eefc;
+	--fg-muted: #9fb0d0;
+	--fg-faint: #66789a;
+
+	--border: #24365a;
+	--border-faint: #1a2740;
+	--border-strong: #3a5286;
+
+	--accent: #ff9f45;
+	--accent-soft: rgb(255 159 69 / 0.2);
+	--accent-fg: #1a0f00;
+
+	--danger: #ff6b6b;
+	--success: #6be5a0;
+	--edited: #b88bff;
+	--edited-bg: rgb(184 139 255 / 0.12);
+
+	--comment: #8fa3c8;
+	--comment-rule: #b88bff;
+	--badge-bg: rgb(184 139 255 / 0.16);
+	--badge-fg: #c9a9ff;
+
+	--radius-panel: 20px;
+	--radius-control: 12px;
+	--panel-shadow: inset 4px 0 0 0 #ff9f45;
+}
+
+[data-theme='flightdeck']::after {
+	background: linear-gradient(160deg, rgb(184 139 255 / 0.07), transparent 45%);
+}
+
+/* -------------------------------------------------------------------- Holo */
+
+[data-theme='holo'] {
+	--sans: 'Segoe UI Light', 'Segoe UI', system-ui, sans-serif;
+	--mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+	--bg: #040a14;
+	--surface: rgb(125 190 230 / 0.07);
+	--surface-sunken: rgb(125 190 230 / 0.04);
+	--surface-hover: rgb(125 190 230 / 0.14);
+	--input-bg: rgb(8 22 38 / 0.55);
+	--fg: #e4f4ff;
+	--fg-muted: #9dc4dd;
+	--fg-faint: #5f8ba6;
+
+	--border: rgb(159 216 255 / 0.22);
+	--border-faint: rgb(159 216 255 / 0.1);
+	--border-strong: rgb(159 216 255 / 0.4);
+
+	--accent: #7fd4ff;
+	--accent-soft: rgb(127 212 255 / 0.22);
+	--accent-fg: #02121e;
+
+	--danger: #ff8fa3;
+	--success: #86f0c0;
+	--edited: #ffe28a;
+	--edited-bg: rgb(255 226 138 / 0.1);
+
+	--comment: #7ba7be;
+	--comment-rule: rgb(127 212 255 / 0.4);
+	--badge-bg: rgb(127 212 255 / 0.14);
+	--badge-fg: #a9dcf5;
+
+	--radius-panel: 14px;
+	--radius-control: 8px;
+	--panel-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.12),
+		0 8px 32px rgb(0 0 0 / 0.4);
+
+	--panel-backdrop: blur(14px);
+}
+
+[data-theme='holo']::before {
+	background:
+		radial-gradient(circle at 15% 10%, rgb(127 212 255 / 0.16), transparent 40%),
+		radial-gradient(circle at 85% 80%, rgb(120 160 255 / 0.12), transparent 45%);
+}
+
+/* A faint interference sweep, like a projection refreshing. */
+[data-theme='holo']::after {
+	background: repeating-linear-gradient(
+		to bottom,
+		rgb(200 235 255 / 0.035) 0px,
+		rgb(200 235 255 / 0.035) 2px,
+		transparent 2px,
+		transparent 6px
+	);
+}
+
+/* -------------------------------------------------------------- Night City */
+
+[data-theme='nightcity'] {
+	--sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+	--mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+	--bg: #08050c;
+	--surface: #140b1c;
+	--surface-sunken: #0d0713;
+	--surface-hover: #22102f;
+	--input-bg: #0b0611;
+	--fg: #ffe9fb;
+	--fg-muted: #c08ab0;
+	--fg-faint: #8a5c7a;
+
+	--border: #3d1740;
+	--border-faint: #260e29;
+	--border-strong: #ff2e88;
+
+	--accent: #ff2e88;
+	--accent-soft: rgb(255 46 136 / 0.25);
+	--accent-fg: #0b0611;
+
+	--danger: #ff4040;
+	--success: #39ff88;
+	--edited: #f5e663;
+	--edited-bg: rgb(245 230 99 / 0.12);
+
+	--comment: #a06a8e;
+	--comment-rule: #f5e663;
+	--badge-bg: rgb(245 230 99 / 0.14);
+	--badge-fg: #f5e663;
+
+	--radius-panel: 0px;
+	--radius-control: 0px;
+	--panel-shadow: 6px 6px 0 0 rgb(255 46 136 / 0.22);
+}
+
+[data-theme='nightcity']::before {
+	background:
+		radial-gradient(circle at 80% 0%, rgb(255 46 136 / 0.14), transparent 45%),
+		radial-gradient(circle at 10% 100%, rgb(245 230 99 / 0.08), transparent 40%);
+}
+
+/* ------------------------------------------------------------- Observatory */
+
+[data-theme='observatory'] {
+	--sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+	--mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+	--bg: #0e1317;
+	--surface: #161d23;
+	--surface-sunken: #11171c;
+	--surface-hover: #1e272f;
+	--input-bg: #11171c;
+	--fg: #dde5ea;
+	--fg-muted: #93a4b1;
+	--fg-faint: #64747f;
+
+	--border: #26323b;
+	--border-faint: #1c252c;
+	--border-strong: #3a4a56;
+
+	--accent: #4fd1c5;
+	--accent-soft: rgb(79 209 197 / 0.18);
+	--accent-fg: #06201d;
+
+	--danger: #e8776d;
+	--success: #6cc08a;
+	--edited: #d9b06a;
+	--edited-bg: rgb(217 176 106 / 0.1);
+
+	--comment: #7b8a95;
+	--comment-rule: #2f3d47;
+	--badge-bg: #1e272f;
+	--badge-fg: #8fa0ac;
+
+	--radius-panel: 6px;
+	--radius-control: 4px;
+	--panel-shadow: none;
+}
