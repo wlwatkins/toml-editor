@@ -5,10 +5,12 @@
 	import { prefs, type CommentMode } from '$lib/prefs.svelte';
 	import { initialFile, isDesktop, onMenu, pickFile, windowCommand } from '$lib/platform';
 	import TitleBar from '$lib/components/TitleBar.svelte';
+	import AboutDialog from '$lib/components/AboutDialog.svelte';
 
 	const editor = new Editor();
 
 	let picking = $state(false);
+	let aboutOpen = $state(false);
 	let view = $state<'form' | 'raw'>('form');
 
 	// Asks the server to show this machine's own file dialog. The request stays
@@ -115,6 +117,10 @@
 				{ label: 'Full screen', hint: 'F11', action: () => windowCommand('toggle-fullscreen') },
 				{ label: 'Developer tools', hint: 'F12', action: () => windowCommand('devtools') }
 			]
+		},
+		{
+			label: 'Help',
+			items: [{ label: 'About TOML Editor', action: () => (aboutOpen = true) }]
 		}
 	]);
 
@@ -160,11 +166,12 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-{#if desktop}
-	<TitleBar {menus} title={editor.openPath} subtitle={editor.openPath} />
-{/if}
+<div class="app">
+	{#if desktop}
+		<TitleBar {menus} title={editor.openPath} subtitle={editor.openPath} />
+	{/if}
 
-<header class="topbar" class:under-titlebar={desktop}>
+	<header class="topbar">
 	<div class="bar-inner">
 		{#if !desktop}
 			<div class="brand">
@@ -234,7 +241,10 @@
 	{/if}
 </header>
 
-<main>
+	<AboutDialog bind:open={aboutOpen} />
+
+	<main>
+		<div class="main-inner">
 	{#if editor.doc}
 		{@const doc = editor.doc}
 		<div class="layout">
@@ -328,21 +338,25 @@
 			{/if}
 		</div>
 	{/if}
-</main>
+		</div>
+	</main>
+</div>
 
 <style>
+	/*
+	 * One column the height of the window: the chrome is fixed and only <main>
+	 * scrolls, so the title bar, the path bar and the tabs never move.
+	 */
+	.app {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		overflow: hidden;
+	}
+
 	.topbar {
-		position: sticky;
-		top: 0;
+		flex: none;
 		z-index: 10;
-	}
-
-	/* The title bar is the thing stuck to the top when it is present. */
-	.topbar.under-titlebar {
-		top: 34px;
-	}
-
-	.topbar {
 		background: var(--surface);
 		backdrop-filter: blur(12px);
 		border-bottom: 1px solid var(--border);
@@ -402,10 +416,11 @@
 		font-size: 0.8rem;
 	}
 
+	/* Inset like the buttons beside it: an outward glow would overhang the bar. */
 	.locator input:focus-visible {
 		outline: none;
 		border-color: var(--accent);
-		box-shadow: 0 0 0 3px var(--accent-soft);
+		box-shadow: inset 0 0 0 2px var(--accent-soft);
 	}
 
 	.actions {
@@ -413,6 +428,15 @@
 		align-items: center;
 		gap: 0.35rem;
 		flex: none;
+	}
+
+	button.ghost:focus-visible,
+	button.primary:focus-visible,
+	.tabs button:focus-visible,
+	.comment-modes button:focus-visible {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: inset 0 0 0 2px var(--accent);
 	}
 
 	button.ghost,
@@ -482,7 +506,16 @@
 		color: var(--fg-faint);
 	}
 
+	/* The scrollport. Full width, so the scrollbar sits at the window edge
+	   rather than against the centred content. */
 	main {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		overflow-x: hidden;
+	}
+
+	.main-inner {
 		max-width: 1180px;
 		margin: 0 auto;
 		padding: 1.25rem;
@@ -495,10 +528,11 @@
 		align-items: start;
 	}
 
+	/* Sticky within the scrollport now, not the window. */
 	.outline {
 		position: sticky;
-		top: 4.5rem;
-		max-height: calc(100vh - 6rem);
+		top: 0;
+		max-height: calc(100vh - 10rem);
 		overflow-y: auto;
 	}
 

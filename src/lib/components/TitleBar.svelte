@@ -154,8 +154,8 @@
 
 <style>
 	.titlebar {
-		position: sticky;
-		top: 0;
+		flex: none;
+		position: relative;
 		z-index: 30;
 		background: var(--surface);
 		backdrop-filter: blur(12px);
@@ -228,6 +228,14 @@
 		cursor: default;
 	}
 
+	/* Inset, so the ring cannot spill out of a 34px bar. */
+	.menu-button:focus-visible,
+	.control:focus-visible,
+	.item:focus-visible {
+		outline: none;
+		box-shadow: inset 0 0 0 2px var(--accent);
+	}
+
 	.menu-button:hover,
 	.menu-button.open {
 		background: var(--surface-hover);
@@ -240,11 +248,14 @@
 		left: 0;
 		min-width: 216px;
 		padding: 0.25rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-strong);
 		border-radius: var(--radius-panel);
-		background: var(--surface);
-		backdrop-filter: blur(14px);
-		box-shadow: var(--panel-shadow, none), 0 12px 32px rgb(0 0 0 / 0.5);
+		/* Fully opaque: a menu stacked over translucent chrome and a moving grid
+		   is unreadable, however much it is blurred. */
+		background: #07161f;
+		box-shadow:
+			0 0 0 1px rgb(34 224 255 / 0.12),
+			0 16px 40px rgb(0 0 0 / 0.75);
 		z-index: 40;
 	}
 

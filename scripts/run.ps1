@@ -59,7 +59,10 @@ function Stop-WithMessage {
     Write-Host ''
     Write-Host "  $Message" -ForegroundColor Red
     Write-Host ''
-    Read-Host '  Press Enter to close'
+    # Launched from the menu, the menu does the pausing.
+    if (-not $env:TOML_EDITOR_NO_PAUSE) {
+        Read-Host '  Press Enter to close' | Out-Null
+    }
     exit 1
 }
 
@@ -157,9 +160,12 @@ function Test-EditorResponding {
 # ---------------------------------------------------------------------------
 
 if (-not $PSScriptRoot) {
-    Stop-WithMessage 'Run this as a script file (.\run.ps1), not by pasting its contents.'
+    Stop-WithMessage 'Run this as a script file (scripts\run.ps1), not by pasting its contents.'
 }
-Set-Location -LiteralPath $PSScriptRoot
+# This script lives in scripts/; everything it touches is one level up.
+$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
+Set-Location -LiteralPath $Root
 
 Write-Host ''
 Write-Host '  TOML Editor' -ForegroundColor Cyan
@@ -183,7 +189,7 @@ if ($File) {
     Write-Step "Opening $fullPath"
 }
 
-$port = Get-ProjectPort -Seed $PSScriptRoot
+$port = Get-ProjectPort -Seed $Root
 
 if (Test-PortListening -Port $port) {
     if (Test-EditorResponding -Port $port) {
@@ -207,7 +213,7 @@ if (Test-PortListening -Port $port) {
     Write-Step "Port $taken is in use by another program, falling back to $port."
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'node_modules'))) {
+if (-not (Test-Path -LiteralPath (Join-Path $Root 'node_modules'))) {
     Write-Step 'Installing dependencies (first run only, this takes a minute)...'
     npm install
     if ($LASTEXITCODE -ne 0) {
@@ -221,7 +227,7 @@ try { $Host.UI.RawUI.WindowTitle = "TOML Editor (debug) - port $port" } catch { 
 # Vite is invoked directly rather than through `npm run dev -- ...` because
 # PowerShell swallows the `--` separator, so npm would eat the flags instead of
 # forwarding them. This is the same thing the `dev` script runs.
-$vite = Join-Path $PSScriptRoot 'node_modules/vite/bin/vite.js'
+$vite = Join-Path $Root 'node_modules/vite/bin/vite.js'
 if (-not (Test-Path -LiteralPath $vite)) {
     Stop-WithMessage 'Vite is not installed. Delete node_modules and run this again to reinstall.'
 }
@@ -248,7 +254,7 @@ if ($Browser) {
 # Debug mode: dev server + the Electron app pointed at it.
 # ---------------------------------------------------------------------------
 
-$electron = Join-Path $PSScriptRoot 'node_modules/electron/dist/electron.exe'
+$electron = Join-Path $Root 'node_modules/electron/dist/electron.exe'
 if (-not (Test-Path -LiteralPath $electron)) {
     Stop-WithMessage 'Electron is not installed. Run "npm install" and try again.'
 }
@@ -264,9 +270,12 @@ Write-Step 'The app window opens once the dev server is up. Edits reload live.'
 Write-Step 'Close the window, or press Ctrl+C here, to stop both.'
 Write-Host ''
 
+# --host 127.0.0.1 pins Vite to the IPv4 loopback. Left to itself it binds
+# whatever "localhost" resolves to, which can be ::1 only -- and then the app,
+# asking for 127.0.0.1, gets connection refused.
 $server = Start-Process -FilePath 'node' `
-    -ArgumentList @($vite, 'dev', '--port', $port, '--strictPort') `
-    -WorkingDirectory $PSScriptRoot -NoNewWindow -PassThru
+    -ArgumentList @($vite, 'dev', '--port', $port, '--strictPort', '--host', '127.0.0.1') `
+    -WorkingDirectory $Root -NoNewWindow -PassThru
 
 try {
     # Wait for Vite to actually answer. Loading the window sooner leaves it on an
@@ -280,12 +289,16 @@ try {
     $env:TOML_EDITOR_DEV_URL = "http://127.0.0.1:$port/"
     if ($NoDevTools) { $env:TOML_EDITOR_NO_DEVTOOLS = '1' }
 
-    $appArgs = @($PSScriptRoot, "--remote-debugging-port=$inspectPort")
+    $appArgs = @($Root, "--remote-debugging-port=$inspectPort")
     if ($fullPath) { $appArgs += $fullPath }
 
-    & $electron @appArgs
-    # A native command that exits without a code leaves $LASTEXITCODE unset.
-    $appExit = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+    # electron.exe is a GUI-subsystem binary, so the call operator does not wait
+    # for it -- the script would race on to the finally block and kill the dev
+    # server out from under the app. Start it and wait on the process itself.
+    $app = Start-Process -FilePath $electron -ArgumentList $appArgs `
+        -WorkingDirectory $Root -NoNewWindow -PassThru
+    $app.WaitForExit()
+    $appExit = $app.ExitCode
 }
 finally {
     Remove-Item Env:\TOML_EDITOR_DEV_URL -ErrorAction SilentlyContinue

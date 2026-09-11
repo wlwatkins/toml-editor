@@ -1,7 +1,7 @@
 {
 	"name": "toml-editor",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -34,6 +34,10 @@
 		"electron-winstaller@5.4.0": true
 	},
 	"description": "Edit a TOML file on your machine as a form, without losing its comments.",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/wlwatkins/toml-editor"
+	},
 	"main": "electron/main.cjs",
 	"build": {
 		"appId": "dev.watkins.toml-editor",

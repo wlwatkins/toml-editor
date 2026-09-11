@@ -123,6 +123,14 @@ handle('toml:pick', async (startDir) => {
 	return { cancelled: false, path: result.filePaths[0] };
 });
 
+ipcMain.handle('app:info', () => ({
+	version: app.getVersion(),
+	electron: process.versions.electron,
+	chrome: process.versions.chrome,
+	node: process.versions.node,
+	platform: `${process.platform} ${process.arch}`
+}));
+
 ipcMain.handle('toml:initial', () => {
 	const file = pendingFile;
 	pendingFile = null;
@@ -267,11 +275,25 @@ function createWindow() {
 	});
 
 	if (DEV_URL) {
-		mainWindow.loadURL(DEV_URL);
+		// The dev server's socket starts accepting a moment before it will answer
+		// a request, so a single attempt can land on a connection-refused page
+		// that never retries. Keep trying until it answers, then stop.
+		let attempts = 0;
+		const load = () => {
+			mainWindow.loadURL(DEV_URL).catch((cause) => {
+				if (!mainWindow || ++attempts > 40) {
+					console.error(`Could not reach the dev server at ${DEV_URL}: ${cause.message}`);
+					return;
+				}
+				setTimeout(load, 400);
+			});
+		};
+		load();
+
 		if (!process.env.TOML_EDITOR_NO_DEVTOOLS) {
 			mainWindow.webContents.openDevTools({ mode: 'bottom' });
 		}
-		mainWindow.webContents.on('render-process-gone', (_e, details) =>
+		mainWindow.webContents.on('render-process-gone', (_event, details) =>
 			console.error('renderer gone:', details.reason)
 		);
 	} else {

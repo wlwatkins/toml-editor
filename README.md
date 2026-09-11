@@ -9,36 +9,78 @@ belongs to. Press **Save** and the file on disk is updated.
 
 It runs entirely on your machine. Nothing is uploaded anywhere.
 
-## Running it
+## Installing it
 
-On Windows, double-click **`run.cmd`**. It installs dependencies on first run,
-starts the server and opens your browser. (`run.ps1` holds the actual logic;
-`run.cmd` exists because Windows opens a double-clicked `.ps1` in an editor
-rather than running it.)
-
-The port is derived from this folder's path, so it is the same every time and
-will not collide with your other Svelte dev servers. Launching it again while
-it is already running just opens the browser at the running copy; if another
-program has taken the port, the next free one is used.
-
-To open a file straight away:
+Run `release/TOML Editor Setup 0.0.1.exe`. It installs per-user (no admin
+prompt), lets you choose the folder, and adds Start menu and desktop shortcuts.
+`.toml` files get an "open with" entry, and passing a file on the command line
+works too:
 
 ```
-run.cmd -File C:\path\to\config.toml
+"TOML Editor.exe" C:\path\to\config.toml
 ```
 
-Or start it by hand:
+To build the installer yourself:
 
-```sh
-npm install
-npm run dev
+```
+run.cmd build                  # -> release/TOML Editor Setup <version>.exe
+run.cmd build -SkipChecks      # skip type checks and tests
+run.cmd build -Unpacked        # just the app directory, no installer
 ```
 
-Either way, choose a file with **Browse…**, which opens your operating
-system's own file dialog, or type a path into the location bar. You can also
-deep-link to a file with `?file=C:\path\to\config.toml`.
+There is no HTTP server in the packaged app. The page is served from a custom
+`app://` protocol and all file access goes over IPC to Electron's main process,
+which is also where the native Open dialog comes from.
 
-Keep the terminal window open while you edit; it is what serves the app.
+## Running it from source
+
+Double-click **`run.cmd`**. It opens a terminal and asks what you want:
+
+```
+  TOML Editor  v0.0.1
+
+   [1] Run               debug mode: dev server + app, DevTools open
+   [2] Run in browser    dev server only, opens your browser
+   [3] Build             check, test and package the installer
+   [4] Publish (dry run) show what a release would do, change nothing
+   [5] Publish           bump, tag and release to GitHub
+   [Q] Quit
+```
+
+It comes back to the menu after each action, so you can build and then publish
+without relaunching. `run.cmd` exists separately from the PowerShell scripts
+because Windows opens a double-clicked `.ps1` in an editor rather than running
+it.
+
+To skip the menu, name the action:
+
+```
+run.cmd run                    debug mode
+run.cmd build                  build the installer
+run.cmd publish                cut a release
+run.cmd -File C:\path\to\config.toml   debug mode, opening that file
+```
+
+Anything after the verb is passed straight through, so `run.cmd publish
+-DryRun` and `run.cmd build -SkipChecks` work. The scripts themselves live in
+`scripts/` and can be run directly.
+
+### Debug mode
+
+`run.cmd run` starts the Vite dev server and opens the app against it, so the
+UI hot-reloads as you edit. DevTools opens docked at the bottom, and a remote
+debugging port (printed on start) is available for an external inspector.
+Closing the window stops the dev server too.
+
+| Switch | Effect |
+| --- | --- |
+| `-File <path>` | open that `.toml` on launch |
+| `-Browser` | serve to a browser instead of launching the app |
+| `-NoDevTools` | launch the app without opening DevTools |
+
+The dev server's port is derived from the project folder's path, so it is the
+same every time and will not collide with your other Svelte dev servers; if
+another program has taken it, the next free port is used.
 
 ## What saving actually does
 
@@ -136,20 +178,64 @@ removed. Restructuring a file is still a text-editor job.
 ## Development
 
 ```sh
-npm run dev        # dev server
+run.cmd            # menu: run, build or publish
+npm run dev        # dev server only (browser)
 npm run check      # svelte-check (type checking)
 npm test           # both unit suites
 npm run test:toml  # round-trip tests for the TOML layer
 npm run test:md    # comment Markdown renderer, including its escaping
-npm run build      # production build
 ```
 
-`npm run test:toml` is the important one when touching anything under
-`src/lib/toml/`. It asserts, among other things, that editing one value changes
-exactly one line and that a file with no pending edits round-trips unchanged.
+`npm test` is the one to run when touching anything under `src/lib/toml/` or
+`src/lib/markdown.ts`. The TOML suite asserts, among other things, that editing
+one value changes exactly one line and that a file with no pending edits
+round-trips unchanged; the Markdown suite asserts that nothing in a comment can
+become live HTML.
 
 `examples/sample.toml` exercises every supported value type and is a good file
 to open while poking at the UI.
+
+## Releasing
+
+```
+run.cmd publish              # predicts the version, asks, then does everything
+run.cmd publish -DryRun      # print every step, change nothing
+run.cmd publish -Bump minor  # force the bump size
+```
+
+It runs entirely on this machine -- there is no CI and no GitHub Actions. In
+order it checks the remote and `gh` login; works out the next version and
+confirms it; bumps `package.json` and the lockfile; builds the installer;
+commits **everything in the working tree** as `release for version x.y.z`; tags
+and pushes; then creates the GitHub release with the installer, its blockmap and
+`latest.yml` attached. If the build fails, the version bump is rolled back and
+nothing is committed.
+
+Because the version bump itself dirties the tree, the release commit takes the
+whole tree rather than just `package.json`. Everything that will be committed --
+including untracked files, since it uses `git add -A` -- is listed for you
+before anything happens, so check that list if you have stray files about.
+
+The proposed version is read off the commits since the last tag, using
+Conventional Commit prefixes:
+
+| Commits since the last tag | Proposed |
+| --- | --- |
+| a `!` marker, or a `BREAKING CHANGE:` footer | major |
+| a `feat:` | minor |
+| anything else | patch |
+| no tags yet | the version already in `package.json` |
+
+You are shown the guess and can type a different one. Other switches:
+`-Version <x.y.z>`, `-Draft`, `-PreRelease`, `-Notes "..."`, `-SkipBuild`,
+`-SkipChecks`, `-Yes`.
+
+### About
+
+**Help -> About TOML Editor** shows the version, plus the Electron, Chromium and
+Node builds it is running on and a link to the repository. The version is baked
+in from `package.json` at build time, so `publish.ps1` bumping the version is
+all it takes to keep it accurate.
 
 ### Layout
 
@@ -166,20 +252,38 @@ src/lib/components/        form controls and section cards
 src/lib/themes.ts          theme metadata for the gallery
 src/lib/themes.css         the six candidate themes, as token overrides
 src/routes/api/file/       GET reads a file, POST writes it atomically
-src/routes/api/pick/       opens the OS file dialog, returns the chosen path
+src/routes/api/pick/       opens the OS file dialog (browser mode only)
 src/routes/gallery/        theme gallery (see below)
-run.ps1 / run.cmd          double-click launcher
+src/lib/platform.ts        one seam: Electron IPC, or fetch to /api in a browser
+electron/main.cjs          window, menus, file IPC, the app:// protocol
+electron/preload.cjs       the entire privileged surface exposed to the page
+scripts/package.mjs        installer build (stages outside the project, see below)
+scripts/menu.ps1           the menu, and the verb dispatch behind run.cmd
+scripts/run.ps1            debug mode: dev server + the app
+scripts/build.ps1          check, test and package the installer
+scripts/publish.ps1        version, tag and publish a GitHub release
+scripts/common.ps1         helpers shared by the PowerShell scripts
+run.cmd                    double-click entry point
 ```
 
-### Why the file picker is a server call
+### Why the installer stages in the temp directory
 
-A browser cannot tell a page the real path of a chosen file -- `<input type="file">` reports `C:\fakepath\name.toml`, and the
-File System Access API
-hands back an opaque handle. Since saving works by path, `/api/pick` shells out
-to the platform's own dialog (a Windows common dialog, `osascript` on macOS,
-`zenity` on Linux) and returns the absolute path. The starting directory is
-passed through the child process's environment, never interpolated into a
-command line.
+electron-builder unpacks ~200 MB of Electron into `<output>/win-unpacked.tmp`
+and immediately renames that directory into place. A real-time scanner is often
+still reading those freshly written binaries, and the rename fails with EPERM --
+reliably so, when the output is inside a watched project tree. `npm run dist`
+therefore stages under the OS temp directory and copies only the finished
+installer back into `release/`.
+
+### Why the file picker is not a browser dialog
+
+A browser cannot tell a page the real path of a chosen file: `<input
+type="file">` reports `C:\fakepath\name.toml`, and the File System Access API
+hands back an opaque handle. Since saving works by absolute path, the picker
+has to come from outside the page. The desktop app uses Electron's native
+dialog; the browser build falls back to `/api/pick`, which shells out to the
+platform's own dialog (a Windows common dialog, `osascript` on macOS, `zenity`
+on Linux).
 
 ### Theme
 
@@ -197,9 +301,24 @@ moving that block into `app.css`.
 The `src/lib/toml/` modules are plain TypeScript with no Svelte dependency,
 which is why they can be tested with `node --experimental-strip-types`.
 
-### Deploying it as a standalone app
+### About
 
-The project uses `@sveltejs/adapter-auto`, which has no local target, so
-`npm run build` produces output but not a runnable server. For a standalone
-local app, install `@sveltejs/adapter-node` and swap the import in
-`vite.config.ts`; `node build` then serves it without the dev server.
+**Help -> About TOML Editor** shows the version, plus the Electron, Chromium and
+Node builds it is running on and a link to the repository. The version is baked
+in from `package.json` at build time, so `publish.ps1` bumping the version is
+all it takes to keep it accurate.
+
+### Layout
+
+The window is one full-height column: the title bar and the path bar are fixed,
+and only the form area scrolls. The scrollbar belongs to `<main>` and sits at
+the window edge; the section outline stays pinned beside the content.
+
+### The window chrome
+
+The window is frameless (`frame: false`) and the title bar, menu bar and
+minimise/maximise/close buttons are Svelte components, so they follow the
+theme. Everything the OS normally provides still works: `frame: false` keeps
+the native sizing border, so edge-drag resizing, Aero Snap, double-click to
+maximise and Win+Arrow all behave as usual. The drag region is declared with
+`-webkit-app-region: drag`, and the buttons opt back out with `no-drag`.

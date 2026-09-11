@@ -1,8 +1,15 @@
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import pkg from './package.json' with { type: 'json' };
 
 export default defineConfig({
+	// Baked in at build time so the About box works in the browser build too,
+	// where there is no Electron to ask.
+	define: {
+		__APP_VERSION__: JSON.stringify(pkg.version),
+		__APP_REPOSITORY__: JSON.stringify(pkg.repository.url)
+	},
 	plugins: [
 		sveltekit({
 			compilerOptions: {

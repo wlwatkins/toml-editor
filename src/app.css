@@ -95,6 +95,13 @@ button {
 	outline-offset: 2px;
 }
 
+/*
+ * Note: an outline is painted OUTSIDE the element, so with an offset it is
+ * visibly larger than what it marks and spills over the edge of a compact bar.
+ * Controls packed into the chrome (title bar, path bar, tab row) override this
+ * with an inset ring instead; see those components.
+ */
+
 ::selection {
 	background: var(--accent-soft);
 	color: var(--fg);

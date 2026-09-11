@@ -60,7 +60,7 @@
 		background: var(--surface);
 		box-shadow: var(--panel-shadow, none);
 		backdrop-filter: var(--panel-backdrop, none);
-		scroll-margin-top: 5.5rem;
+		scroll-margin-top: 1rem;
 	}
 
 	header {

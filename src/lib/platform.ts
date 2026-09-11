@@ -32,10 +32,21 @@ interface DesktopBridge {
 	writeFile(input: { path: string; text: string; mtimeMs: number }): Promise<Result<SavedFile>>;
 	pickFile(dir: string): Promise<Result<PickResult>>;
 	initialFile(): Promise<string | null>;
+	appInfo(): Promise<AppInfo>;
 	onMenu(handler: (action: string) => void): void;
 	windowState(): Promise<WindowState>;
 	windowCommand(command: WindowCommand): void;
 	onWindowState(handler: (state: WindowState) => void): void;
+}
+
+export interface AppInfo {
+	version: string;
+	repository: string;
+	/** Only present in the desktop app. */
+	electron?: string;
+	chrome?: string;
+	node?: string;
+	platform?: string;
 }
 
 export interface WindowState {
@@ -139,6 +150,22 @@ export function onMenu(handler: (action: string) => void) {
 	bridge()?.onMenu((action) => {
 		handler(action);
 	});
+}
+
+/**
+ * Version and build details for the About box. The version is baked in at build
+ * time so this works in the browser too; the desktop app adds its runtime
+ * versions on top.
+ */
+export async function appInfo(): Promise<AppInfo> {
+	const base: AppInfo = { version: __APP_VERSION__, repository: __APP_REPOSITORY__ };
+	const desktop = bridge();
+	if (!desktop) return base;
+	try {
+		return { ...base, ...(await desktop.appInfo()) };
+	} catch {
+		return base;
+	}
 }
 
 export async function windowState(): Promise<WindowState> {
