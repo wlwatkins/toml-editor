@@ -5,6 +5,7 @@
 	import { prefs, type CommentMode } from '$lib/prefs.svelte';
 	import {
 		ask,
+		checkForUpdates,
 		initialFile,
 		isDesktop,
 		onMenu,
@@ -13,6 +14,21 @@
 	} from '$lib/platform';
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
+	import UpdateNotice from '$lib/components/UpdateNotice.svelte';
+
+	// Installing an update quits the app, so it gets the same guard as Close.
+	async function confirmInstall(): Promise<boolean> {
+		if (!editor.dirty) return true;
+		const count = editor.changeCount;
+		const choice = await ask({
+			message: 'Restart to install the update?',
+			detail: `${count} unsaved change${count === 1 ? '' : 's'} will be lost. Save first if you want to keep them.`,
+			buttons: ['Restart anyway', 'Cancel'],
+			defaultId: 1,
+			cancelId: 1
+		});
+		return choice === 0;
+	}
 
 	const editor = new Editor();
 
@@ -160,7 +176,11 @@
 		},
 		{
 			label: 'Help',
-			items: [{ label: 'About TOML Editor', action: () => (aboutOpen = true) }]
+			items: [
+				{ label: 'Check for updates…', action: () => void checkForUpdates().catch(() => {}) },
+				'separator' as const,
+				{ label: 'About TOML Editor', action: () => (aboutOpen = true) }
+			]
 		}
 	]);
 
@@ -286,6 +306,10 @@
 </header>
 
 	<AboutDialog bind:open={aboutOpen} />
+
+	{#if desktop}
+		<UpdateNotice beforeInstall={confirmInstall} />
+	{/if}
 
 	<main>
 		<div class="main-inner">

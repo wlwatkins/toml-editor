@@ -320,12 +320,15 @@ try {
     Invoke-Checked "Pushing $tag..." { git push origin $tag }
     $bumped = $false   # committed and pushed; there is nothing left to undo
 }
-catch {
+finally {
+    # This must be finally, not catch: every failure above leaves through
+    # Stop-WithMessage, which calls exit, and exit skips catch but still runs
+    # finally. With catch the rollback never fired and a failed build left
+    # package.json at the new version.
     if ($bumped) {
         Write-Warn "Rolling the version back to $current."
         npm version $current --no-git-tag-version --allow-same-version *> $null
     }
-    throw
 }
 
 # The blockmap and latest.yml are what electron-updater reads, so ship them

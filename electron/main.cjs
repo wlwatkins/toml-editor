@@ -154,6 +154,129 @@ ipcMain.handle('toml:initial', () => {
 	return file;
 });
 
+// ---------------------------------------------------------------------------
+// Self-update, via electron-updater against the GitHub releases.
+//
+// publish.ps1 attaches latest.yml and the installer's blockmap to every
+// release; electron-updater reads the former to learn the newest version and
+// uses the latter to download only the blocks that changed. The `publish`
+// block in package.json is what tells it which repository to ask, and is
+// also what makes electron-builder write app-update.yml into the package.
+//
+// Nothing downloads without the user saying so. The start-up check is silent:
+// only an actual update is shown. A check from the Help menu is `manual` and
+// reports "up to date" and errors as well.
+// ---------------------------------------------------------------------------
+
+let updateState = app.isPackaged
+	? { state: 'idle', manual: false }
+	: {
+			state: 'unsupported',
+			manual: false,
+			reason: 'Updates are only available in the installed app, not when run from source.'
+		};
+
+/** Replaces the state; `manual` carries over unless the caller sets it. */
+function setUpdateState(next) {
+	updateState = { manual: updateState.manual, ...next };
+	send('update:state', updateState);
+}
+
+/** Created on first use so an unpackaged run never loads the module. */
+let updater = null;
+function getUpdater() {
+	if (updater) return updater;
+	const { autoUpdater } = require('electron-updater');
+	autoUpdater.autoDownload = false;
+	// A downloaded update that the user did not restart for still lands on
+	// the next normal quit, so nobody stays behind by closing the notice.
+	autoUpdater.autoInstallOnAppQuit = true;
+	autoUpdater.logger = null;
+
+	autoUpdater.on('checking-for-update', () => setUpdateState({ state: 'checking' }));
+	autoUpdater.on('update-available', (info) =>
+		setUpdateState({ state: 'available', version: info.version })
+	);
+	autoUpdater.on('update-not-available', (info) =>
+		setUpdateState({ state: 'none', version: info.version })
+	);
+	autoUpdater.on('download-progress', (progress) =>
+		setUpdateState({
+			state: 'downloading',
+			version: updateState.version,
+			percent: Math.round(progress.percent)
+		})
+	);
+	autoUpdater.on('update-downloaded', (info) =>
+		setUpdateState({ state: 'downloaded', version: info.version })
+	);
+	autoUpdater.on('error', (cause) => {
+		// The silent check has nothing useful to say about a flaky network.
+		if (!updateState.manual) {
+			setUpdateState({ state: 'idle' });
+			return;
+		}
+		setUpdateState({
+			state: 'error',
+			version: updateState.version,
+			error: cause && cause.message ? cause.message : String(cause)
+		});
+	});
+	updater = autoUpdater;
+	return updater;
+}
+
+function requireUpdates() {
+	if (!app.isPackaged) throw new Error(updateState.reason);
+}
+
+ipcMain.handle('update:state', () => updateState);
+
+handle('update:check', async () => {
+	if (!app.isPackaged) {
+		// Run from source: say so in the notice rather than failing silently.
+		setUpdateState({ ...updateState, manual: true });
+		return {};
+	}
+	if (updateState.state === 'checking' || updateState.state === 'downloading') return {};
+	if (updateState.state === 'downloaded') {
+		// Already sitting on one; just say so again.
+		setUpdateState({ ...updateState, manual: true });
+		return {};
+	}
+	setUpdateState({ state: 'checking', manual: true });
+	// Failures surface through the 'error' event; the promise is not awaited
+	// so the menu action returns at once.
+	getUpdater().checkForUpdates().catch(() => {});
+	return {};
+});
+
+handle('update:download', async () => {
+	requireUpdates();
+	if (updateState.state !== 'available') throw new Error('There is no update to download.');
+	setUpdateState({ state: 'downloading', version: updateState.version, percent: 0 });
+	getUpdater().downloadUpdate().catch(() => {});
+	return {};
+});
+
+handle('update:install', async () => {
+	requireUpdates();
+	if (updateState.state !== 'downloaded') throw new Error('The update has not finished downloading.');
+	// isSilent = false shows the installer; isForceRunAfter = true relaunches.
+	setImmediate(() => getUpdater().quitAndInstall(false, true));
+	return {};
+});
+
+/** The quiet check on start-up, a few seconds after the window is up. */
+function scheduleStartupUpdateCheck() {
+	if (!app.isPackaged || process.env.TOML_EDITOR_NO_UPDATE_CHECK) return;
+	setTimeout(() => {
+		if (updateState.state !== 'idle') return;
+		setUpdateState({ state: 'checking', manual: false });
+		getUpdater().checkForUpdates().catch(() => {});
+	}, 5000);
+}
+
 /** Serves the built SPA, falling back to index.html so routing works. */
 function serveBundle() {
 	protocol.handle(SCHEME, async (request) => {
@@ -337,6 +460,7 @@ if (!app.requestSingleInstanceLock()) {
 		// No native menu: the app draws its own.
 		Menu.setApplicationMenu(null);
 		createWindow();
+		scheduleStartupUpdateCheck();
 
 		app.on('activate', () => {
 			if (BrowserWindow.getAllWindows().length === 0) createWindow();

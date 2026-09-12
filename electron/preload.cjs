@@ -19,6 +19,14 @@ contextBridge.exposeInMainWorld('tomlEditor', {
 		ipcRenderer.on('menu', (_event, action) => handler(action));
 	},
 
+	updateState: () => ipcRenderer.invoke('update:state'),
+	checkForUpdates: () => ipcRenderer.invoke('update:check'),
+	downloadUpdate: () => ipcRenderer.invoke('update:download'),
+	installUpdate: () => ipcRenderer.invoke('update:install'),
+	onUpdateState: (handler) => {
+		ipcRenderer.on('update:state', (_event, state) => handler(state));
+	},
+
 	windowState: () => ipcRenderer.invoke('window:state'),
 	windowCommand: (command) => ipcRenderer.send('window:command', String(command)),
 	onWindowState: (handler) => {

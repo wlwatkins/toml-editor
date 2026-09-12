@@ -14,7 +14,9 @@ import { applyDrafts, makeItem } from '../src/lib/toml/edit.ts';
 import { emptyDrafts, type Drafts } from '../src/lib/toml/serialize.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const sample = readFileSync(join(here, '..', 'examples', 'sample.toml'), 'utf8');
+// Normalise to LF: core.autocrlf checks the fixture out with CRLF on Windows,
+// and the CRLF test below builds its own input from this baseline.
+const sample = readFileSync(join(here, '..', 'examples', 'sample.toml'), 'utf8').replace(/\r\n/g, '\n');
 
 let failures = 0;
 let checks = 0;

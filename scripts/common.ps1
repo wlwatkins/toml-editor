@@ -69,7 +69,10 @@ function Get-ProjectVersion {
 
 function Get-InstallerPath {
     param([string]$Root, [string]$Version)
-    return Join-Path $Root "release/TOML Editor Setup $Version.exe"
+    # No spaces: GitHub rewrites them in asset names, and electron-updater
+    # downloads whatever latest.yml says, which electron-builder derives from
+    # artifactName in package.json. The three have to agree.
+    return Join-Path $Root "release/TOML-Editor-Setup-$Version.exe"
 }
 
 <#

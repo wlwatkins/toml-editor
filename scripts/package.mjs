@@ -30,7 +30,10 @@ console.log(`Staging in ${staging}`);
 const cli = join(root, 'node_modules', 'electron-builder', 'cli.js');
 const result = spawnSync(
 	process.execPath,
-	[cli, `--config.directories.output=${staging}`, ...args],
+	// `--publish never`: the publish block in package.json exists so the app
+	// knows where to look for updates, and so electron-builder writes
+	// app-update.yml; publish.ps1 does the actual uploading with gh.
+	[cli, `--config.directories.output=${staging}`, '--publish', 'never', ...args],
 	{ cwd: root, stdio: 'inherit' }
 );
 

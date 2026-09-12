@@ -50,6 +50,11 @@ Saving must not reformat the file. `src/lib/toml/` exists to guarantee that:
 "no drafts rewrites nothing". If you touch the TOML layer, keep those passing;
 they are the difference between this tool and one that mangles configs.
 
+The test normalises `examples/sample.toml` to LF as it loads it. With
+`core.autocrlf=true` the fixture is checked out with CRLF, which put `\r\n`
+in the multi-line string expectation and made the CRLF test double up the
+carriage returns. Keep that normalisation; the CRLF case is built from it.
+
 Drafts live in `Drafts { scalars, arrays }`, keyed by node id, and only exist
 once a field is actually touched — a *missing* entry is what means "untouched".
 Preserve that distinction; seeding drafts eagerly would rewrite the whole file.
@@ -239,6 +244,27 @@ Non-obvious things that were all found the hard way:
   bar declares `-webkit-app-region: drag` and buttons opt out with `no-drag`.
 - Menu dropdowns must stay **opaque**. Translucent panels over the translucent
   title bar and the moving grid are unreadable at any blur radius.
+
+Self-update (`electron-updater`, the updater section of `main.cjs`):
+
+- `build.publish` in package.json is what tells the app which GitHub repo to
+  ask **and** what makes electron-builder write `app-update.yml` into the
+  package. `package.mjs` passes `--publish never` so that block never makes
+  electron-builder upload anything; publish.ps1 attaches `latest.yml` and the
+  blockmap itself.
+- Everything is guarded by `app.isPackaged`; run from source the state is
+  `unsupported` and the module is never loaded. Set
+  `TOML_EDITOR_NO_UPDATE_CHECK` to skip the start-up check.
+- `autoDownload` is off; `autoInstallOnAppQuit` is on. The renderer only ever
+  sees the `update:state` pushes, and the `manual` flag on the state is what
+  decides whether "up to date" and errors are shown.
+- Installing quits the app, so `+page.svelte` gates it on `editor.dirty` with
+  `platform.ask()`, the same as Close.
+- The installer is named `TOML-Editor-Setup-<version>.exe`, with **no
+  spaces**, on purpose. `latest.yml` names the file with spaces replaced by
+  dashes, GitHub replaces spaces in asset names with dots, and the updater
+  downloads whatever `latest.yml` says. `artifactName` in package.json and
+  `Get-InstallerPath` in common.ps1 must keep agreeing.
 
 ## run.ps1
 

@@ -1,104 +1,136 @@
+<div align="center">
+
+<img src="build-resources/icon.png" width="96" alt="TOML Editor icon">
+
 # TOML Editor
 
-Edit a TOML file on your machine as a web form instead of as raw text.
+**Edit a TOML file as a form. Save it back without touching a byte you didn't change.**
 
-Point it at a `.toml` file, and every key becomes an input — text boxes, number
-fields, toggles, date pickers, array list editors — grouped into the same
-sections the file uses, with each comment shown next to the key or section it
-belongs to. Press **Save** and the file on disk is updated.
+[![Latest release](https://img.shields.io/github/v/release/wlwatkins/toml-editor?label=release&color=00e5ff&labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/wlwatkins/toml-editor/total?color=00e5ff&labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-00e5ff?labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases/latest)
+[![TOML 1.0](https://img.shields.io/badge/TOML-1.0-00e5ff?labelColor=0a0a0a)](https://toml.io/en/v1.0.0)
+[![Runs offline](https://img.shields.io/badge/runs-100%25%20local-00e5ff?labelColor=0a0a0a)](#private-by-construction)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-00e5ff?labelColor=0a0a0a)](LICENSE)
 
-It runs entirely on your machine. Nothing is uploaded anywhere.
+[![Svelte 5](https://img.shields.io/badge/Svelte-5-ff3e00?logo=svelte&logoColor=white&labelColor=0a0a0a)](https://svelte.dev)
+[![Electron 44](https://img.shields.io/badge/Electron-44-47848f?logo=electron&logoColor=white&labelColor=0a0a0a)](https://www.electronjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white&labelColor=0a0a0a)](https://www.typescriptlang.org)
+
+<br>
+
+<img src="assets/editor.png" width="900" alt="TOML Editor with sample.toml open: a section outline on the left, a Top level card with typed inputs for a string, a bool toggle, an int shown as 2_500 and a float, each with its comment above it">
+
+<sub>Every key becomes a control, every section a card, and every comment from the file sits beside the key it describes. Note the <code>2_500</code>: number formatting is kept exactly as written.</sub>
+
+<br><br>
+
+[**Download the installer**](https://github.com/wlwatkins/toml-editor/releases/latest) · [Features](#features) · [What saving actually does](#what-saving-actually-does) · [Comments](#comments)
+
+</div>
+
+---
+
+## Why
+
+Config GUIs usually have one fatal flaw: they parse the file into an object,
+let you edit the object, and write the object back out. Comments vanish, keys
+get re-ordered, `2_500` becomes `2500`, and the diff for a one-line change is
+the whole file.
+
+TOML Editor does not rebuild the file. It records where every value sits in
+the original text and, on save, **replaces only the characters of the values
+you changed**. Edit two fields in a 400-line config and you get a two-line diff.
+
+## Features
+
+- **The right control for every key.** Text boxes, number fields, toggles,
+  date and time pickers, list editors for arrays, nested fields for inline
+  tables. Sections become cards, nested by path depth, with an outline pinned
+  beside the content for jumping around.
+- **Comments are first-class.** Each comment is shown next to the key or section
+  it belongs to and rendered as Markdown: headings, banners, lists, code, links.
+  Long blocks fold to their first line. Nothing is dropped, not even a note
+  sitting on its own between blank lines.
+- **Saving is surgical.** Comments, key order, blank lines, number formatting,
+  quoting style and alignment survive byte for byte.
+- **Validated as you type.** An invalid integer or date is flagged inline and
+  blocks saving, so the file never receives something that will not parse.
+- **Raw view before you commit.** The **Raw** tab shows the exact text Save will
+  write.
+- **Safe on disk.** Writes are atomic, external edits are detected and refused
+  with a conflict message, and only `.toml`/`.tml` paths can be opened or
+  written, so a mistyped path fails loudly rather than clobbering something else.
+- **A proper desktop app.** Frameless window, native Open dialog, an
+  "open with" entry for `.toml` files, and a file path accepted on the command
+  line.
+- **Keeps itself current.** On start-up it quietly asks GitHub for a newer
+  release and offers it in a bar you can dismiss. Nothing downloads until you
+  say so, and a downloaded update installs on the next restart. **Help ->
+  Check for updates…** does it on demand.
+
+### Private by construction
+
+It runs entirely on your machine. There is no server and no telemetry, and
+nothing is uploaded anywhere. The only network request it ever makes is the
+update check against this repository's GitHub releases.
 
 ## Installing it
 
-Run `release/TOML Editor Setup 0.0.1.exe`. It installs per-user (no admin
-prompt), lets you choose the folder, and adds Start menu and desktop shortcuts.
-`.toml` files get an "open with" entry, and passing a file on the command line
-works too:
+Grab `TOML-Editor-Setup-<version>.exe` from the
+[latest release](https://github.com/wlwatkins/toml-editor/releases/latest).
+It installs per-user with no admin prompt, lets you choose the folder, and adds
+Start menu and desktop shortcuts. Passing a file on the command line works too:
 
 ```
 "TOML Editor.exe" C:\path\to\config.toml
 ```
 
-To build the installer yourself:
+<div align="center">
+<img src="assets/welcome.png" width="720" alt="The empty editor: a path bar with Open, Browse and Save buttons over a perspective grid, and a Browse for a file button in the centre">
+<br>
+<sub>Launch it, type or browse to a path, and the form appears.</sub>
+</div>
 
-```
-run.cmd build                  # -> release/TOML Editor Setup <version>.exe
-run.cmd build -SkipChecks      # skip type checks and tests
-run.cmd build -Unpacked        # just the app directory, no installer
-```
+## What you can edit
 
-There is no HTTP server in the packaged app. The page is served from a custom
-`app://` protocol and all file access goes over IPC to Electron's main process,
-which is also where the native Open dialog comes from.
+| TOML                     | Control                                        |
+| ------------------------ | ---------------------------------------------- |
+| String                   | Text box, or a textarea for multi-line values  |
+| Integer / float          | Number input (text, for hex/octal/underscored) |
+| Boolean                  | Toggle                                         |
+| Local date / time        | Native date and time pickers                   |
+| Local date-time          | Native date-time picker                        |
+| Offset date-time         | Text box (no browser control keeps the zone)   |
+| Array                    | List editor: edit, reorder and add/remove items |
+| Inline table `{ a = 1 }` | Nested fields, patched in place                |
+| `[table]`, `[[array]]`   | A section card each, nested by path depth      |
 
-## Running it from source
+**Close** (File -> Close file, or Ctrl+W) puts the editor back to its empty
+state. With unsaved changes it asks first, naming how many would be lost; the
+path stays in the location bar so the file is one click away again.
 
-Double-click **`run.cmd`**. It opens a terminal and asks what you want:
+### Not supported
 
-```
-  TOML Editor  v0.0.1
-
-   [1] Run               debug mode: dev server + app, DevTools open
-   [2] Run in browser    dev server only, opens your browser
-   [3] Build             check, test and package the installer
-   [4] Publish (dry run) show what a release would do, change nothing
-   [5] Publish           bump, tag and release to GitHub
-   [Q] Quit
-```
-
-It comes back to the menu after each action, so you can build and then publish
-without relaunching. `run.cmd` exists separately from the PowerShell scripts
-because Windows opens a double-clicked `.ps1` in an editor rather than running
-it.
-
-To skip the menu, name the action:
-
-```
-run.cmd run                    debug mode
-run.cmd build                  build the installer
-run.cmd publish                cut a release
-run.cmd -File C:\path\to\config.toml   debug mode, opening that file
-```
-
-Anything after the verb is passed straight through, so `run.cmd publish
--DryRun` and `run.cmd build -SkipChecks` work. The scripts themselves live in
-`scripts/` and can be run directly.
-
-### Debug mode
-
-`run.cmd run` starts the Vite dev server and opens the app against it, so the
-UI hot-reloads as you edit. DevTools opens docked at the bottom, and a remote
-debugging port (printed on start) is available for an external inspector.
-Closing the window stops the dev server too.
-
-| Switch | Effect |
-| --- | --- |
-| `-File <path>` | open that `.toml` on launch |
-| `-Browser` | serve to a browser instead of launching the app |
-| `-NoDevTools` | launch the app without opening DevTools |
-
-The dev server's port is derived from the project folder's path, so it is the
-same every time and will not collide with your other Svelte dev servers; if
-another program has taken it, the next free port is used.
+Adding or removing **keys and sections**. The form edits the values of what is
+already in the file; array items are the exception and can be added and
+removed. Restructuring a file is still a text-editor job.
 
 ## What saving actually does
 
-The thing that usually makes a config GUI unusable is that saving reformats the
-whole file and throws the comments away. This editor does not rebuild the file
-from a parsed object. It parses TOML into a tree where every value remembers its
-exact character range in the original text, and a save replaces **only the ranges
-whose values you changed**.
-
-Everything else survives byte for byte:
+The parser turns TOML into a tree where every value remembers its exact
+character range in the original text. A save replaces **only the ranges whose
+values you changed**. Everything else survives byte for byte:
 
 - comments, both on their own line and trailing a value
 - key order, blank lines and section order
 - number formatting such as `2_500`, `0xff`, `1e6`
-- quoting style — `'literal'` stays literal, `"""multi-line"""` stays multi-line
+- quoting style: `'literal'` stays literal, `"""multi-line"""` stays multi-line
 - your alignment, e.g. `host = "127.0.0.1"   # bind address`
 
-Editing two fields in a 400-line file produces a two-line diff.
+A value edited back to its original text produces no change at all. Arrays are
+the one exception: when items are added, removed or reordered the whole array
+is re-rendered, since new items have no original text.
 
 Two other safeguards:
 
@@ -107,33 +139,6 @@ Two other safeguards:
 - **External edits are detected.** If the file changed on disk after you opened
   it, saving is refused with a conflict message instead of overwriting the
   newer version.
-
-Only `.toml` and `.tml` files can be opened or written, so a mistyped path
-fails loudly rather than clobbering something unrelated.
-
-## What you can edit
-
-| TOML                     | Control                                      |
-| ------------------------ | -------------------------------------------- |
-| String                   | Text box, or a textarea for multi-line values |
-| Integer / float          | Number input (text, for hex/octal/underscored) |
-| Boolean                  | Toggle                                        |
-| Local date / time        | Native date and time pickers                  |
-| Local date-time          | Native date-time picker                       |
-| Offset date-time         | Text box (no browser control keeps the zone)  |
-| Array                    | List editor: edit, reorder and add/remove items |
-| Inline table `{ a = 1 }` | Nested fields, patched in place               |
-| `[table]`, `[[array]]`   | A section card each, nested by path depth     |
-
-Values are validated as you type — an invalid integer or date is flagged inline
-and blocks saving, so the file never receives something that will not parse.
-
-The **Raw** tab shows the exact text that Save will write, which is worth a
-glance before committing to a change.
-
-**Close** (or File -> Close file, or Ctrl+W) puts the editor back to its empty
-state. With unsaved changes it asks first, naming how many would be lost; the
-path stays in the location bar so the file is one click away again.
 
 ## Comments
 
@@ -155,174 +160,40 @@ comment marker), the rule-title-rule banner style above, bullet and numbered
 lists, block quotes, fenced and indented code, and inline code, **bold**,
 *italic*, ~~strikethrough~~ and links.
 
-Any block longer than two lines gets a disclosure triangle, so a wall of
-explanation can be folded down to its first line. The **Comments** control in
-the toolbar sets the default for the whole file:
+Any block longer than two lines gets a disclosure triangle. The **Comments**
+control in the toolbar sets the default for the whole file, and the choice is
+remembered between sessions:
 
-- **Full** -- everything expanded
-- **Brief** -- every long block folded to a one-line summary
-- **Off** -- comments hidden entirely
-
-That choice is remembered between sessions.
+| Mode      | Effect                                        |
+| --------- | --------------------------------------------- |
+| **Full**  | everything expanded                           |
+| **Brief** | every long block folded to a one-line summary |
+| **Off**   | comments hidden entirely                      |
 
 Comment text is escaped before any markup is generated, so nothing in a file
 can turn into live HTML; a `<script>` in a comment is displayed as the text it
 is. A link is only made clickable for `http`, `https` and `mailto`.
 
-Comments the editor cannot attach to a specific key -- a banner at the top of
-the file, or a note sitting on its own between blank lines -- are kept and
-shown above whatever follows them, rather than dropped.
+Comments the editor cannot attach to a specific key, such as a banner at the
+top of the file or a note sitting on its own between blank lines, are kept and
+shown above whatever follows them rather than dropped.
 
-### Not supported
-
-Adding or removing **keys and sections** — the form edits the values of what is
-already in the file. Array items are the exception: those can be added and
-removed. Restructuring a file is still a text-editor job.
-
-## Development
-
-```sh
-run.cmd            # menu: run, build or publish
-npm run dev        # dev server only (browser)
-npm run check      # svelte-check (type checking)
-npm test           # both unit suites
-npm run test:toml  # round-trip tests for the TOML layer
-npm run test:md    # comment Markdown renderer, including its escaping
-```
-
-`npm test` is the one to run when touching anything under `src/lib/toml/` or
-`src/lib/markdown.ts`. The TOML suite asserts, among other things, that editing
-one value changes exactly one line and that a file with no pending edits
-round-trips unchanged; the Markdown suite asserts that nothing in a comment can
-become live HTML.
-
-`examples/sample.toml` exercises every supported value type and is a good file
-to open while poking at the UI.
-
-## Releasing
-
-```
-run.cmd publish              # predicts the version, asks, then does everything
-run.cmd publish -DryRun      # print every step, change nothing
-run.cmd publish -Bump minor  # force the bump size
-```
-
-It runs entirely on this machine -- there is no CI and no GitHub Actions. In
-order it checks the remote and `gh` login; works out the next version and
-confirms it; bumps `package.json` and the lockfile; builds the installer;
-commits **everything in the working tree** as `release for version x.y.z`; tags
-and pushes; then creates the GitHub release with the installer, its blockmap and
-`latest.yml` attached. If the build fails, the version bump is rolled back and
-nothing is committed.
-
-Because the version bump itself dirties the tree, the release commit takes the
-whole tree rather than just `package.json`. Everything that will be committed --
-including untracked files, since it uses `git add -A` -- is listed for you
-before anything happens, so check that list if you have stray files about.
-
-The proposed version is read off the commits since the last tag, using
-Conventional Commit prefixes:
-
-| Commits since the last tag | Proposed |
-| --- | --- |
-| a `!` marker, or a `BREAKING CHANGE:` footer | major |
-| a `feat:` | minor |
-| anything else | patch |
-| no tags yet | the version already in `package.json` |
-
-You are shown the guess and can type a different one. Other switches:
-`-Version <x.y.z>`, `-Draft`, `-PreRelease`, `-Notes "..."`, `-SkipBuild`,
-`-SkipChecks`, `-Yes`.
-
-### About
-
-**Help -> About TOML Editor** shows the version, plus the Electron, Chromium and
-Node builds it is running on and a link to the repository. The version is baked
-in from `package.json` at build time, so `publish.ps1` bumping the version is
-all it takes to keep it accurate.
-
-### Layout
-
-```
-src/lib/toml/          the comment-preserving TOML layer (no UI, no Svelte)
-  ast.ts               node types; every node carries its source span
-  parse.ts             TOML 1.0 parser that records spans and comments
-  serialize.ts         value -> text, quoting styles, validation
-  edit.ts              drafts -> minimal source patches
-src/lib/markdown.ts        comment Markdown renderer (escapes first, always)
-src/lib/editor.svelte.ts   open/save state, pending edits keyed by node id
-src/lib/prefs.svelte.ts    remembered UI preferences (comment display mode)
-src/lib/components/        form controls and section cards
-src/lib/themes.ts          theme metadata for the gallery
-src/lib/themes.css         the six candidate themes, as token overrides
-src/routes/api/file/       GET reads a file, POST writes it atomically
-src/routes/api/pick/       opens the OS file dialog (browser mode only)
-src/routes/gallery/        theme gallery (see below)
-src/lib/platform.ts        one seam: Electron IPC, or fetch to /api in a browser
-electron/main.cjs          window, menus, file IPC, the app:// protocol
-electron/preload.cjs       the entire privileged surface exposed to the page
-scripts/package.mjs        installer build (stages outside the project, see below)
-scripts/menu.ps1           the menu, and the verb dispatch behind run.cmd
-scripts/run.ps1            debug mode: dev server + the app
-scripts/build.ps1          check, test and package the installer
-scripts/publish.ps1        version, tag and publish a GitHub release
-scripts/common.ps1         helpers shared by the PowerShell scripts
-run.cmd                    double-click entry point
-```
-
-### Why the installer stages in the temp directory
-
-electron-builder unpacks ~200 MB of Electron into `<output>/win-unpacked.tmp`
-and immediately renames that directory into place. A real-time scanner is often
-still reading those freshly written binaries, and the rename fails with EPERM --
-reliably so, when the output is inside a watched project tree. `npm run dist`
-therefore stages under the OS temp directory and copies only the finished
-installer back into `release/`.
-
-### Why the file picker is not a browser dialog
-
-A browser cannot tell a page the real path of a chosen file: `<input
-type="file">` reports `C:\fakepath\name.toml`, and the File System Access API
-hands back an opaque handle. Since saving works by absolute path, the picker
-has to come from outside the page. The desktop app uses Electron's native
-dialog; the browser build falls back to `/api/pick`, which shells out to the
-platform's own dialog (a Windows common dialog, `osascript` on macOS, `zenity`
-on Linux).
-
-### Theme
+## Look
 
 The editor wears **Grid**: neon cyan on black, hairline borders that glow, a
 perspective grid on the backdrop and translucent panels that read as edge-lit
-glass. It is defined as the `:root` design tokens in `src/app.css`; there is no
-light mode.
+glass. Everything the OS normally provides still works in the frameless
+window: edge-drag resizing, Aero Snap, double-click to maximise and Win+Arrow.
 
-`/gallery` keeps five other candidates (Nostromo, Flight Deck, Holo, Night City,
-Observatory) for comparison, each rendering the real components with live
-fields. They are token overrides in `src/lib/themes.css` scoped under
-`[data-theme="..."]`, so swapping the app to a different one is a matter of
-moving that block into `app.css`.
+## License
 
-The `src/lib/toml/` modules are plain TypeScript with no Svelte dependency,
-which is why they can be tested with `node --experimental-strip-types`.
+[GPL-3.0](LICENSE). Use it at home or at work, on as many machines as you
+like, and modify it freely. If you redistribute it, in original or modified
+form, you must pass on the source code and the same freedoms to whoever
+receives it.
 
-### About
+---
 
-**Help -> About TOML Editor** shows the version, plus the Electron, Chromium and
-Node builds it is running on and a link to the repository. The version is baked
-in from `package.json` at build time, so `publish.ps1` bumping the version is
-all it takes to keep it accurate.
-
-### Layout
-
-The window is one full-height column: the title bar and the path bar are fixed,
-and only the form area scrolls. The scrollbar belongs to `<main>` and sits at
-the window edge; the section outline stays pinned beside the content.
-
-### The window chrome
-
-The window is frameless (`frame: false`) and the title bar, menu bar and
-minimise/maximise/close buttons are Svelte components, so they follow the
-theme. Everything the OS normally provides still works: `frame: false` keeps
-the native sizing border, so edge-drag resizing, Aero Snap, double-click to
-maximise and Win+Arrow all behave as usual. The drag region is declared with
-`-webkit-app-region: drag`, and the buttons opt back out with `no-drag`.
+<div align="center">
+<sub>Built with Svelte 5, SvelteKit 2 and Electron. Source and issues on <a href="https://github.com/wlwatkins/toml-editor">GitHub</a>.</sub>
+</div>

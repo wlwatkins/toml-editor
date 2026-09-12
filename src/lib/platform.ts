@@ -35,6 +35,11 @@ interface DesktopBridge {
 	appInfo(): Promise<AppInfo>;
 	ask(options: AskOptions): Promise<Result<{ response: number }>>;
 	onMenu(handler: (action: string) => void): void;
+	updateState(): Promise<UpdateState>;
+	checkForUpdates(): Promise<Result<object>>;
+	downloadUpdate(): Promise<Result<object>>;
+	installUpdate(): Promise<Result<object>>;
+	onUpdateState(handler: (state: UpdateState) => void): void;
 	windowState(): Promise<WindowState>;
 	windowCommand(command: WindowCommand): void;
 	onWindowState(handler: (state: WindowState) => void): void;
@@ -64,6 +69,31 @@ export interface WindowState {
 	maximized: boolean;
 	fullscreen: boolean;
 	focused: boolean;
+}
+
+/**
+ * Where the self-updater is. `manual` says whether the user asked for the
+ * check, which decides whether "you are up to date" and errors are worth
+ * showing; the automatic check on start-up stays silent unless it finds one.
+ */
+export interface UpdateState {
+	state:
+		| 'unsupported'
+		| 'idle'
+		| 'checking'
+		| 'available'
+		| 'none'
+		| 'downloading'
+		| 'downloaded'
+		| 'error';
+	manual: boolean;
+	/** The version on offer, once one is known. */
+	version?: string;
+	/** Download progress, 0 to 100. */
+	percent?: number;
+	error?: string;
+	/** Why updates are unsupported here (browser, or an unpackaged app). */
+	reason?: string;
 }
 
 /** Everything the custom title bar can ask the window to do. */
@@ -205,6 +235,50 @@ export async function ask(options: AskOptions): Promise<number> {
 	} catch {
 		return cancelId;
 	}
+}
+
+const NO_UPDATES: UpdateState = {
+	state: 'unsupported',
+	manual: false,
+	reason: 'Updates are only available in the installed desktop app.'
+};
+
+/** The updater's current state. Unsupported in a browser. */
+export async function updateState(): Promise<UpdateState> {
+	const desktop = bridge();
+	if (!desktop) return NO_UPDATES;
+	try {
+		return await desktop.updateState();
+	} catch {
+		return NO_UPDATES;
+	}
+}
+
+/**
+ * Asks GitHub whether a newer release exists. Progress arrives through
+ * onUpdateState(); the call itself only kicks it off.
+ */
+export async function checkForUpdates(): Promise<void> {
+	const desktop = bridge();
+	if (desktop) unwrap(await desktop.checkForUpdates());
+}
+
+export async function downloadUpdate(): Promise<void> {
+	const desktop = bridge();
+	if (desktop) unwrap(await desktop.downloadUpdate());
+}
+
+/** Quits and runs the downloaded installer. Only valid once state is 'downloaded'. */
+export async function installUpdate(): Promise<void> {
+	const desktop = bridge();
+	if (desktop) unwrap(await desktop.installUpdate());
+}
+
+/** Updater state changes. Wrapped to return nothing; see onMenu(). */
+export function onUpdateState(handler: (state: UpdateState) => void) {
+	bridge()?.onUpdateState((state) => {
+		handler(state);
+	});
 }
 
 export async function windowState(): Promise<WindowState> {
