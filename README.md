@@ -65,9 +65,9 @@ you changed**. Edit two fields in a 400-line config and you get a two-line diff.
   "open with" entry for `.toml` files, and a file path accepted on the command
   line.
 - **Keeps itself current.** On start-up it quietly asks GitHub for a newer
-  release and offers it in a bar you can dismiss. Nothing downloads until you
-  say so, and a downloaded update installs on the next restart. **Help ->
-  Check for updates…** does it on demand.
+  release and, if there is one, offers it. Nothing downloads until you say so,
+  and a downloaded update installs on the next restart. **Help -> Check for
+  updates…** does it on demand.
 
 ### Private by construction
 

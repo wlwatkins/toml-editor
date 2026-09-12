@@ -5,7 +5,6 @@
 	import { prefs, type CommentMode } from '$lib/prefs.svelte';
 	import {
 		ask,
-		checkForUpdates,
 		initialFile,
 		isDesktop,
 		onMenu,
@@ -14,7 +13,9 @@
 	} from '$lib/platform';
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
-	import UpdateNotice from '$lib/components/UpdateNotice.svelte';
+	import UpdateDialog from '$lib/components/UpdateDialog.svelte';
+
+	let updatesOpen = $state(false);
 
 	// Installing an update quits the app, so it gets the same guard as Close.
 	async function confirmInstall(): Promise<boolean> {
@@ -177,7 +178,7 @@
 		{
 			label: 'Help',
 			items: [
-				{ label: 'Check for updates…', action: () => void checkForUpdates().catch(() => {}) },
+				{ label: 'Check for updates…', action: () => (updatesOpen = true) },
 				'separator' as const,
 				{ label: 'About TOML Editor', action: () => (aboutOpen = true) }
 			]
@@ -306,9 +307,8 @@
 </header>
 
 	<AboutDialog bind:open={aboutOpen} />
-
 	{#if desktop}
-		<UpdateNotice beforeInstall={confirmInstall} />
+		<UpdateDialog bind:open={updatesOpen} beforeInstall={confirmInstall} />
 	{/if}
 
 	<main>
