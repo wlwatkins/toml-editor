@@ -66,8 +66,8 @@ you changed**. Edit two fields in a 400-line config and you get a two-line diff.
   line.
 - **Keeps itself current.** On start-up it quietly asks GitHub for a newer
   release and, if there is one, offers it. Nothing downloads until you say so,
-  and a downloaded update installs on the next restart. **Help -> Check for
-  updates…** does it on demand.
+  and nothing installs until you choose **Restart and install**. **Help ->
+  Check for updates…** does it on demand.
 
 ### Private by construction
 

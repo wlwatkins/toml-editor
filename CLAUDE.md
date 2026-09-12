@@ -255,9 +255,17 @@ Self-update (`electron-updater`, the updater section of `main.cjs`):
 - Everything is guarded by `app.isPackaged`; run from source the state is
   `unsupported` and the module is never loaded. Set
   `TOML_EDITOR_NO_UPDATE_CHECK` to skip the start-up check.
-- `autoDownload` is off; `autoInstallOnAppQuit` is on. The renderer only ever
-  sees the `update:state` pushes, and the `manual` flag on the state is what
-  decides whether "up to date" and errors are shown.
+- `autoDownload` and `autoInstallOnAppQuit` are both off. Installing only
+  happens through "Restart and install", which runs the normal installer; a
+  silent install on quit fails without a word when the app is somewhere that
+  needs elevation (it has been installed to Program Files). The renderer only
+  ever sees the `update:state` pushes, and the `manual` flag on the state is
+  what decides whether "up to date" and errors are shown.
+- Everything the updater says goes to `updater.log` in the user-data folder
+  (`%APPDATA%\toml-editor\updater.log`). Read that before theorising about
+  "it did not update". GitHub's release feed, which electron-updater reads,
+  can lag a fresh release by a little while; the dialog shows the newest
+  version it saw for that reason.
 - Installing quits the app, so `+page.svelte` gates it on `editor.dirty` with
   `platform.ask()`, the same as Close.
 - The installer is named `TOML-Editor-Setup-<version>.exe`, with **no

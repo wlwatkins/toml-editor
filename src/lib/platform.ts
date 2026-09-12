@@ -94,6 +94,8 @@ export interface UpdateState {
 	error?: string;
 	/** Why updates are unsupported here (browser, or an unpackaged app). */
 	reason?: string;
+	/** Where the desktop app writes the updater's log. */
+	logPath?: string;
 }
 
 /** Everything the custom title bar can ask the window to do. */

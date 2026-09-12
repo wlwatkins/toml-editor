@@ -176,9 +176,33 @@ let updateState = app.isPackaged
 			reason: 'Updates are only available in the installed app, not when run from source.'
 		};
 
+/**
+ * Everything the updater says goes to updater.log in the user-data folder, so
+ * "it did not update" can be answered after the fact. The path is included in
+ * the state so the dialog can point at it.
+ */
+const updateLogPath = () => path.join(app.getPath('userData'), 'updater.log');
+
+function updateLog(level, message) {
+	const line = `${new Date().toISOString()} ${level.padEnd(5)} ${message}\n`;
+	fs.appendFile(updateLogPath(), line, 'utf8').catch(() => {});
+}
+
+/** Keeps the log from growing forever: over 1 MB it is started afresh. */
+async function rotateUpdateLog() {
+	const file = updateLogPath();
+	try {
+		const info = await fs.stat(file);
+		if (info.size > 1024 * 1024) await fs.rename(file, `${file}.old`);
+	} catch {
+		// No log yet.
+	}
+}
+
 /** Replaces the state; `manual` carries over unless the caller sets it. */
 function setUpdateState(next) {
-	updateState = { manual: updateState.manual, ...next };
+	updateState = { manual: updateState.manual, logPath: updateLogPath(), ...next };
+	updateLog('state', JSON.stringify(next));
 	send('update:state', updateState);
 }
 
@@ -186,12 +210,21 @@ function setUpdateState(next) {
 let updater = null;
 function getUpdater() {
 	if (updater) return updater;
+	void rotateUpdateLog();
 	const { autoUpdater } = require('electron-updater');
 	autoUpdater.autoDownload = false;
-	// A downloaded update that the user did not restart for still lands on
-	// the next normal quit, so nobody stays behind by closing the notice.
-	autoUpdater.autoInstallOnAppQuit = true;
-	autoUpdater.logger = null;
+	// Installing only ever happens through "Restart and install". A silent
+	// install on quit would fail without a word for an app installed somewhere
+	// that needs elevation, such as Program Files; the explicit path runs the
+	// normal installer, which asks for it.
+	autoUpdater.autoInstallOnAppQuit = false;
+	autoUpdater.logger = {
+		info: (message) => updateLog('info', message),
+		warn: (message) => updateLog('warn', message),
+		error: (message) => updateLog('error', message),
+		debug: (message) => updateLog('debug', message)
+	};
+	updateLog('info', `updater created; app ${app.getVersion()}, electron ${process.versions.electron}`);
 
 	autoUpdater.on('checking-for-update', () => setUpdateState({ state: 'checking' }));
 	autoUpdater.on('update-available', (info) =>
@@ -247,9 +280,26 @@ handle('update:check', async () => {
 	setUpdateState({ state: 'checking', manual: true });
 	// Failures surface through the 'error' event; the promise is not awaited
 	// so the menu action returns at once.
-	getUpdater().checkForUpdates().catch(() => {});
+	startUpdateCheck();
 	return {};
 });
+
+/**
+ * Runs a check. electron-updater resolves null without emitting anything when
+ * it considers itself inactive, which would otherwise leave the state parked
+ * on 'checking' and every later check returning early.
+ */
+function startUpdateCheck() {
+	getUpdater()
+		.checkForUpdates()
+		.then((result) => {
+			if (result === null) {
+				updateLog('warn', 'checkForUpdates resolved null: updater inactive');
+				setUpdateState({ state: 'idle' });
+			}
+		})
+		.catch(() => {});
+}
 
 handle('update:download', async () => {
 	requireUpdates();
@@ -273,7 +323,7 @@ function scheduleStartupUpdateCheck() {
 	setTimeout(() => {
 		if (updateState.state !== 'idle') return;
 		setUpdateState({ state: 'checking', manual: false });
-		getUpdater().checkForUpdates().catch(() => {});
+		startUpdateCheck();
 	}, 5000);
 }
 

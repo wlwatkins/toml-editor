@@ -89,6 +89,12 @@
 			<p class="message">Checking for updates…</p>
 		{:else if current.state === 'none'}
 			<p class="message">You are up to date.</p>
+			{#if current.version}
+				<p class="hint">
+					Newest release on GitHub: {current.version}. A release published moments ago can take
+					a little while to show up there.
+				</p>
+			{/if}
 		{:else if current.state === 'available'}
 			<p class="message">
 				<strong>Version {current.version}</strong> is available.
@@ -106,11 +112,15 @@
 				<strong>Version {current.version}</strong> is ready to install.
 			</p>
 			<p class="hint">
-				Restart now, or close this and it will install when you next quit the app.
+				Restart now, or come back to this dialog later. The installer will ask for permission
+				if the app lives somewhere that needs it.
 			</p>
 		{:else if current.state === 'error'}
 			<p class="message error">Could not check for updates.</p>
 			<p class="hint">{current.error}</p>
+			{#if current.logPath}
+				<p class="hint">Details: <span class="mono">{current.logPath}</span></p>
+			{/if}
 		{:else if current.state === 'unsupported'}
 			<p class="message">{current.reason}</p>
 		{:else}
