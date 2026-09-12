@@ -8,7 +8,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/wlwatkins/toml-editor?label=release&color=00e5ff&labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/wlwatkins/toml-editor/total?color=00e5ff&labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-00e5ff?labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-00e5ff?labelColor=0a0a0a)](#installing-it)
 [![TOML 1.0](https://img.shields.io/badge/TOML-1.0-00e5ff?labelColor=0a0a0a)](https://toml.io/en/v1.0.0)
 [![Runs offline](https://img.shields.io/badge/runs-100%25%20local-00e5ff?labelColor=0a0a0a)](#private-by-construction)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-00e5ff?labelColor=0a0a0a)](LICENSE)
@@ -67,7 +67,8 @@ you changed**. Edit two fields in a 400-line config and you get a two-line diff.
 - **Keeps itself current.** On start-up it quietly asks GitHub for a newer
   release and, if there is one, offers it. Nothing downloads until you say so,
   and nothing installs until you choose **Restart and install**. **Help ->
-  Check for updates…** does it on demand.
+  Check for updates…** does it on demand. Windows and Linux only; the macOS
+  build is unsigned and cannot self-update.
 
 ### Private by construction
 
@@ -77,14 +78,32 @@ update check against this repository's GitHub releases.
 
 ## Installing it
 
-Grab `TOML-Editor-Setup-<version>.exe` from the
-[latest release](https://github.com/wlwatkins/toml-editor/releases/latest).
-It installs per-user with no admin prompt, lets you choose the folder, and adds
-Start menu and desktop shortcuts. Passing a file on the command line works too:
+Every release on the
+[releases page](https://github.com/wlwatkins/toml-editor/releases/latest)
+carries a build for each platform:
+
+| Platform | File | Notes |
+| --- | --- | --- |
+| Windows x64 | `TOML-Editor-Setup-<version>.exe` | Installs per-user with no admin prompt, lets you choose the folder, adds Start menu and desktop shortcuts. Self-updates. |
+| macOS | `TOML-Editor-<version>-arm64.dmg` (Apple silicon) or `-x64.dmg` (Intel) | Unsigned, see below. No self-update. |
+| Linux x64 | `TOML-Editor-<version>-x86_64.AppImage` | Mark it executable and run it. Self-updates. |
+
+Passing a file on the command line works on every platform:
 
 ```
 "TOML Editor.exe" C:\path\to\config.toml
 ```
+
+> **The macOS and Linux builds are untested.** I only have a Windows machine.
+> Those two are built by GitHub Actions on Apple's and Ubuntu's runners from
+> the same commit as the Windows installer, and I have never run either. If
+> you try one, please [open an issue](https://github.com/wlwatkins/toml-editor/issues)
+> and say how it went, good or bad. That feedback is the only testing they get.
+>
+> The macOS app is not signed or notarised, since that needs a paid Apple
+> developer account. On first launch macOS will refuse it; open **System
+> Settings -> Privacy & Security** and choose **Open Anyway**, or clear the
+> quarantine flag with `xattr -d com.apple.quarantine "/Applications/TOML Editor.app"`.
 
 <div align="center">
 <img src="assets/welcome.png" width="720" alt="The empty editor: a path bar with Open, Browse and Save buttons over a perspective grid, and a Browse for a file button in the centre">

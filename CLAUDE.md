@@ -252,9 +252,12 @@ Self-update (`electron-updater`, the updater section of `main.cjs`):
   package. `package.mjs` passes `--publish never` so that block never makes
   electron-builder upload anything; publish.ps1 attaches `latest.yml` and the
   blockmap itself.
-- Everything is guarded by `app.isPackaged`; run from source the state is
-  `unsupported` and the module is never loaded. Set
-  `TOML_EDITOR_NO_UPDATE_CHECK` to skip the start-up check.
+- `UPDATES_UNSUPPORTED` in main.cjs gates everything: run from source, or on
+  macOS (the build is unsigned and electron-updater refuses to update an
+  unsigned app there), the state is `unsupported` and the module is never
+  loaded. Set `TOML_EDITOR_NO_UPDATE_CHECK` to skip the start-up check.
+- Artifact names on every platform have **no spaces** (see the installer
+  note below); `artifactName` is set per platform in package.json.
 - `autoDownload` and `autoInstallOnAppQuit` are both off. Installing only
   happens through "Restart and install", which runs the normal installer; a
   silent install on quit fails without a word when the app is somewhere that
@@ -298,9 +301,17 @@ going through `npx`, because Node refuses to spawn a `.cmd` without a shell.
 
 ## Releasing
 
-`publish.ps1` does the whole release on this machine. There is no CI and no
-GitHub Actions, and that is deliberate -- do not add a workflow that duplicates
-it.
+`publish.ps1` does the whole release on this machine: version, checks, the
+Windows installer, tag, GitHub release. Do not move any of that into CI.
+
+The one workflow, `.github/workflows/release-assets.yml`, exists because a
+Windows machine physically cannot produce the other two platforms:
+electron-builder throws on macOS targets from any other host, and the AppImage
+tool ships `mksquashfs` for Linux and macOS only. It triggers on the release
+being published, checks out that tag, builds the macOS dmgs and the Linux
+AppImage, and attaches them with `gh release upload`. It never versions, tags,
+tests or builds Windows. Those artifacts are untested by the author (no Mac or
+Linux machine); the README says so and asks users for feedback.
 
 - The proposed version comes from Conventional Commit prefixes since the last
   tag (`!`/`BREAKING CHANGE` -> major, `feat` -> minor, else patch). With no

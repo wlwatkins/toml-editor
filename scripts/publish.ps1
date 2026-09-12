@@ -352,4 +352,10 @@ Write-Host ''
 Write-Good "Published $tag"
 if ($url) { Write-Host "  $url" -ForegroundColor Green }
 Write-Step "$([math]::Round((Get-Item -LiteralPath $installer).Length / 1MB, 1)) MB installer attached"
+if (-not $Draft) {
+    Write-Step 'GitHub Actions is now building the macOS and Linux artifacts; they attach themselves in ~10 minutes.'
+}
+else {
+    Write-Step 'The macOS and Linux artifacts are built by GitHub Actions once the draft is published.'
+}
 Write-Host ''

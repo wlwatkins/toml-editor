@@ -168,13 +168,20 @@ ipcMain.handle('toml:initial', () => {
 // reports "up to date" and errors as well.
 // ---------------------------------------------------------------------------
 
-let updateState = app.isPackaged
-	? { state: 'idle', manual: false }
-	: {
-			state: 'unsupported',
-			manual: false,
-			reason: 'Updates are only available in the installed app, not when run from source.'
-		};
+/**
+ * Null where self-update can work. Unpackaged runs have nothing to update;
+ * macOS builds are unsigned (no Apple developer account) and electron-updater
+ * refuses to update an unsigned app there, so it is not offered at all.
+ */
+const UPDATES_UNSUPPORTED = !app.isPackaged
+	? 'Updates are only available in the installed app, not when run from source.'
+	: process.platform === 'darwin'
+		? 'Updates on macOS need a signed build. Get new versions from the GitHub releases page.'
+		: null;
+
+let updateState = UPDATES_UNSUPPORTED
+	? { state: 'unsupported', manual: false, reason: UPDATES_UNSUPPORTED }
+	: { state: 'idle', manual: false };
 
 /**
  * Everything the updater says goes to updater.log in the user-data folder, so
@@ -260,14 +267,14 @@ function getUpdater() {
 }
 
 function requireUpdates() {
-	if (!app.isPackaged) throw new Error(updateState.reason);
+	if (UPDATES_UNSUPPORTED) throw new Error(UPDATES_UNSUPPORTED);
 }
 
 ipcMain.handle('update:state', () => updateState);
 
 handle('update:check', async () => {
-	if (!app.isPackaged) {
-		// Run from source: say so in the notice rather than failing silently.
+	if (UPDATES_UNSUPPORTED) {
+		// Say so in the dialog rather than failing silently.
 		setUpdateState({ ...updateState, manual: true });
 		return {};
 	}
@@ -319,7 +326,7 @@ handle('update:install', async () => {
 
 /** The quiet check on start-up, a few seconds after the window is up. */
 function scheduleStartupUpdateCheck() {
-	if (!app.isPackaged || process.env.TOML_EDITOR_NO_UPDATE_CHECK) return;
+	if (UPDATES_UNSUPPORTED || process.env.TOML_EDITOR_NO_UPDATE_CHECK) return;
 	setTimeout(() => {
 		if (updateState.state !== 'idle') return;
 		setUpdateState({ state: 'checking', manual: false });

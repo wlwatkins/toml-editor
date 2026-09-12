@@ -1,7 +1,7 @@
 {
 	"name": "toml-editor",
 	"private": true,
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -88,13 +88,21 @@
 			"target": [
 				"AppImage"
 			],
-			"category": "Development"
+			"category": "Development",
+			"artifactName": "TOML-Editor-${version}-${arch}.${ext}"
 		},
 		"mac": {
 			"target": [
-				"dmg"
+				{
+					"target": "dmg",
+					"arch": [
+						"x64",
+						"arm64"
+					]
+				}
 			],
-			"category": "public.app-category.developer-tools"
+			"category": "public.app-category.developer-tools",
+			"artifactName": "TOML-Editor-${version}-${arch}.${ext}"
 		}
 	},
 	"author": "Watkins",

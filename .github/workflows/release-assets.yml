@@ -1,0 +1,66 @@
+# Builds the macOS and Linux artifacts for a release and attaches them.
+#
+# This is deliberately NOT a release pipeline. scripts/publish.ps1 on the
+# author's Windows machine decides the version, runs the checks, builds the
+# Windows installer, tags, and creates the GitHub release. That release being
+# published is what triggers this workflow, which only adds the two platforms a
+# Windows machine cannot build: electron-builder refuses macOS targets on any
+# other host, and the AppImage tooling ships Linux and macOS helpers only.
+#
+# Neither artifact is tested by the author, who has no Mac or Linux machine.
+# The README says so and asks users to report how they fare.
+name: macOS and Linux builds
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  # No signing certificate on either platform, so do not go looking for one.
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  # electron-builder must not try to publish; the upload step below does it.
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS (dmg, x64 and arm64)
+            args: --mac dmg --x64 --arm64
+            assets: release/*.dmg release/*.dmg.blockmap release/latest-mac.yml
+          - os: ubuntu-latest
+            label: Linux (AppImage, x64)
+            args: --linux AppImage --x64
+            assets: release/*.AppImage release/latest-linux.yml
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The web bundle Electron ships. The type check and unit suites already
+      # ran on this exact commit in publish.ps1 before the release existed.
+      - run: npm run build
+
+      - name: Package
+        run: npx electron-builder ${{ matrix.args }} --publish never
+
+      - name: List artifacts
+        run: ls -la release
+
+      - name: Attach to the release
+        run: gh release upload "${{ github.event.release.tag_name }}" ${{ matrix.assets }} --clobber
