@@ -24,10 +24,11 @@ npm run dev          # vite dev server only
 npm run electron     # build, then run the app against the built bundle
 npm run dist         # installer -> release/ (build.ps1 wraps this)
 npm run check        # svelte-kit sync + svelte-check -- the type/lint gate
-npm test             # all four unit suites -- run this one
+npm test             # all five unit suites -- run this one
 npm run test:toml    # round-trip tests for TOML (node type-stripping)
 npm run test:json    # round-trip tests for JSON and JSONC
 npm run test:yaml    # round-trip tests for YAML
+npm run test:convert # format-to-format conversion, and what it warns about
 npm run test:md      # comment Markdown renderer + its escaping guarantees
 npm run build        # production build
 npm run preview      # serve the production build
@@ -133,6 +134,7 @@ src/lib/format/          plain TS, no Svelte import -- keep it that way so the
   ast.ts                 node types, spans, type labels, ParseError
   drafts.ts              Drafts, the Format interface, renderValue, indents
   edit.ts                drafts -> patches; synthetic nodes for new array items
+  convert.ts             the one non-surgical path: whole-document conversion
   registry.ts            the format list; formatForPath(), EXTENSIONS
 src/lib/toml/            parse.ts (TOML 1.0) + serialize.ts (exports `toml`)
 src/lib/json/            parse.ts (JSON + JSONC) + serialize.ts (`json`,`jsonc`)
@@ -141,6 +143,7 @@ src/lib/markdown.ts      comment Markdown renderer; escape-then-generate only
 src/lib/prefs.svelte.ts  remembered UI preferences (comment display mode)
 src/lib/editor.svelte.ts Editor class: open/save, drafts, derived edit plan
 src/lib/components/      ValueField (recursive), EntryRow, SectionCard, ThemePreview
+                         ConvertDialog: pick a target, read the losses, write
 src/lib/themes.ts        theme metadata; themes.css holds the token overrides
 src/routes/api/file/     GET read, POST atomic write with an mtime conflict check
 src/routes/api/pick/     spawns the OS file dialog, returns the chosen path
@@ -150,6 +153,7 @@ src/lib/components/TitleBar.svelte   custom frameless chrome (menus + buttons)
 electron/main.cjs        window, IPC, app:// protocol, dev-URL mode
 electron/preload.cjs     the whole privileged surface, via contextBridge
 scripts/*-roundtrip-test.ts  one suite per format; scripts/markdown-test.ts
+scripts/convert-test.ts      conversion; compares data, not bytes
 scripts/package.mjs      installer build; stages outside the project (see below)
 scripts/menu.ps1         the menu, and the verb dispatch behind run.cmd
 scripts/run.ps1          debug mode
@@ -200,6 +204,34 @@ walking the AST has to handle that.
   what Electron ships.
 - `tsconfig.json` extends the generated `.svelte-kit/tsconfig.json`; add
   top-level options by extending it, and put path aliases in `kit.alias`.
+
+## Conversion is the exception to the invariant
+
+`format/convert.ts` is the only path that regenerates a file instead of
+patching it, because the target format has different syntax for everything.
+Everything else in `format/` exists to avoid doing that; this one cannot.
+
+- It flattens the document into its own small tree (`ConvValue`, `ConvMap`) and
+  emits from there, so a new target needs one emitter, not a new edge in every
+  parser. `buildTree` is where the flat `tables` list becomes nesting again.
+- The warnings are **produced while emitting**, not guessed beforehand, so they
+  describe what the returned text actually did. `Loss.first()` exists because
+  an emitter renders some values twice -- once speculatively, to see whether
+  they fit on one line -- and a count that grew each time would lie.
+- Where a target cannot hold a value the rule is *report, never drop silently*:
+  a `null` going to TOML is left out **and named in the warning**; an
+  unrepresentable **array item** is written as `""` instead, because dropping it
+  would shorten the array and shift every index after it.
+- `inline` on a map decides section versus one-liner, and comes from the
+  source: a JSON object written on one line stays one field, a multi-line one
+  becomes a `[section]` or a nested mapping. Same rule the form UI uses.
+- Conversion reads `editor.preview`, not the file, so pending edits come along.
+  It writes to a **new path** and never to the open file; ConvertDialog asks
+  before replacing an existing file, since a convert writes the whole thing.
+- `scripts/convert-test.ts` compares *data*, not bytes: it re-parses the output
+  with the target's own parser and diffs the value tree, order-insensitively.
+  Pinning the exact output would make every formatting tweak a test edit; what
+  must not change is that no value is silently altered or lost.
 
 ## Comments
 

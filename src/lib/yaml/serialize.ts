@@ -34,7 +34,7 @@ function hasControl(value: string): boolean {
  * same string. Anything that would come back as a number, a boolean or null --
  * `2`, `yes`, `~` -- has to be quoted, or saving would change the type.
  */
-function isPlainSafe(value: string): boolean {
+export function isPlainSafe(value: string): boolean {
 	if (value === '') return false;
 	if (/^\s|\s$/.test(value)) return false;
 	if (/[\n\r\t]/.test(value)) return false;

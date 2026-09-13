@@ -1,7 +1,7 @@
 {
 	"name": "toml-editor",
 	"private": true,
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -10,10 +10,11 @@
 		"dist": "npm run build && node scripts/package.mjs",
 		"dist:dir": "npm run build && node scripts/package.mjs --dir",
 		"preview": "vite preview",
-		"test": "npm run test:toml && npm run test:json && npm run test:yaml && npm run test:md",
+		"test": "npm run test:toml && npm run test:json && npm run test:yaml && npm run test:convert && npm run test:md",
 		"test:toml": "node --experimental-strip-types --no-warnings scripts/toml-roundtrip-test.ts",
 		"test:json": "node --experimental-strip-types --no-warnings scripts/json-roundtrip-test.ts",
 		"test:yaml": "node --experimental-strip-types --no-warnings scripts/yaml-roundtrip-test.ts",
+		"test:convert": "node --experimental-strip-types --no-warnings scripts/convert-test.ts",
 		"test:md": "node --experimental-strip-types --no-warnings scripts/markdown-test.ts",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

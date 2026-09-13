@@ -13,6 +13,7 @@
 	} from '$lib/platform';
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
+	import ConvertDialog from '$lib/components/ConvertDialog.svelte';
 	import UpdateDialog from '$lib/components/UpdateDialog.svelte';
 
 	let updatesOpen = $state(false);
@@ -35,6 +36,7 @@
 
 	let picking = $state(false);
 	let aboutOpen = $state(false);
+	let convertOpen = $state(false);
 	let view = $state<'form' | 'raw'>('form');
 
 	// Asks the server to show this machine's own file dialog. The request stays
@@ -89,6 +91,7 @@
 			else if (action === 'save') editor.save();
 			else if (action === 'reload') editor.reload();
 			else if (action === 'revert') editor.revert();
+			else if (action === 'convert') convertOpen = true;
 			else if (action === 'close') closeFile();
 		});
 	});
@@ -144,6 +147,12 @@
 				},
 				{ label: 'Discard changes', action: () => editor.revert(), enabled: editor.dirty },
 				{ label: 'Close file', hint: 'Ctrl+W', action: closeFile, enabled: !!editor.doc },
+				'separator' as const,
+				{
+					label: 'Convert to…',
+					action: () => (convertOpen = true),
+					enabled: !!editor.doc
+				},
 				'separator' as const,
 				{ label: 'Exit', hint: 'Alt+F4', action: () => windowCommand('quit') }
 			]
@@ -284,6 +293,12 @@
 				<button
 					type="button"
 					class="ghost"
+					onclick={() => (convertOpen = true)}
+					disabled={editor.busy}>Convert…</button
+				>
+				<button
+					type="button"
+					class="ghost"
 					onclick={() => editor.revert()}
 					disabled={!editor.dirty || editor.busy}>Revert</button
 				>
@@ -307,6 +322,7 @@
 </header>
 
 	<AboutDialog bind:open={aboutOpen} />
+	<ConvertDialog bind:open={convertOpen} {editor} />
 	{#if desktop}
 		<UpdateDialog bind:open={updatesOpen} beforeInstall={confirmInstall} />
 	{/if}

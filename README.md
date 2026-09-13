@@ -66,6 +66,10 @@ scalars, flow versus block style, and anchors.
 - **Four formats, one editor.** `.toml`, `.tml`, `.json`, `.jsonc`, `.yaml` and
   `.yml`. The format is chosen from the extension and shown in the toolbar; the
   form, the comments and the surgical save work the same way in all of them.
+- **Convert between them.** **Convert…** in the toolbar (File -> Convert to…)
+  writes the open file out as any of the other three. It tells you what the
+  target format cannot hold *before* it writes anything, shows the full output,
+  and saves to a new file -- the one you have open is never touched.
 - **Safe on disk.** Writes are atomic, external edits are detected and refused
   with a conflict message, and only those extensions can be opened or written,
   so a mistyped path fails loudly rather than clobbering something else.
@@ -157,6 +161,38 @@ In YAML specifically: a file holding **several documents** separated by `---`
 is refused rather than edited, and an **alias** (`*ref`, including a `<<` merge
 key) is shown but read-only — rewriting the reference in one place would not
 change what it points at.
+
+## Converting between formats
+
+**Convert…** in the toolbar, or **File -> Convert to…**, rewrites the open
+document in one of the other three formats. It is the one thing in this editor
+that is *not* surgical: the target has different syntax for everything, so the
+file is generated afresh rather than patched.
+
+So the dialog leads with the cost. It lists exactly what this conversion will
+change or lose -- with counts, and with the keys named where that helps --
+before the button that writes anything:
+
+| Going to | What it costs |
+| --- | --- |
+| Any format | Blank lines, indentation, alignment and your quoting style. Keys, values and comments are what carry over. |
+| JSON | Every comment, because JSON has none. Dates and times become quoted strings. `inf` and `nan` become `null`. |
+| JSONC | Nothing beyond the layout: comments are rewritten with `//`, in the same places. |
+| TOML | `null` (TOML has no such value) -- those keys are listed by name and left out. Keys move above their sub-sections, as TOML requires. A YAML alias or tagged node, which cannot be re-expressed anywhere else. A file whose top level is a list cannot become TOML at all, and is refused rather than mangled. |
+| YAML | Nothing, usually. `inf` becomes `.inf`; a date becomes an unquoted scalar, which a YAML 1.2 reader hands back as text. |
+| TOML-flavoured numbers | `2_500`, `0xff` and `0o17` are rewritten in plain decimal anywhere but TOML. The value is the same; the spelling is not. |
+
+What does carry over is more than you might expect: comments (to any format
+that has them, including the ones that sit alone between blank lines),
+key order, sections, arrays of tables, multi-line strings as block scalars,
+and strings that would otherwise read back as a number or a boolean, which
+stay quoted so their type cannot drift.
+
+The output is shown in full under **Preview** first. Unsaved edits are included
+in it. **Convert** writes to the path in the box -- the same name with the new
+extension, by default -- and asks first if something is already there. Nothing
+is written to the file you have open, which keeps its pending changes either
+way. **Copy** puts the output on the clipboard instead.
 
 ## What saving actually does
 
