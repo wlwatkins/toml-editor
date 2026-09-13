@@ -1,12 +1,13 @@
 import { error, json } from '@sveltejs/kit';
 import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { extname, isAbsolute, resolve } from 'node:path';
+import { EXTENSIONS, extensionList } from '$lib/format/registry';
 import type { RequestHandler } from './$types';
 
-const ALLOWED_EXTENSIONS = new Set(['.toml', '.tml']);
+const ALLOWED_EXTENSIONS = new Set(EXTENSIONS);
 
 /**
- * Both handlers refuse anything that is not a TOML file. This is a local tool,
+ * Both handlers refuse any extension no format claims. This is a local tool,
  * so the point is not to sandbox a hostile caller -- it is to make a mistyped
  * path fail loudly instead of overwriting something unrelated.
  */
@@ -15,7 +16,7 @@ function checkPath(raw: string | null): string {
 	const path = resolve(raw.trim());
 	if (!isAbsolute(path)) error(400, 'Path must be absolute');
 	if (!ALLOWED_EXTENSIONS.has(extname(path).toLowerCase())) {
-		error(400, 'Only .toml and .tml files can be opened');
+		error(400, `Only these files can be opened: ${extensionList()}`);
 	}
 	return path;
 }

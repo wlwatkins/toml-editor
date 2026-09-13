@@ -255,7 +255,7 @@
 				type="text"
 				spellcheck="false"
 				autocomplete="off"
-				placeholder="Path to a .toml file on this machine"
+				placeholder="Path to a config file on this machine"
 				bind:value={editor.pathInput}
 				list="recent-files"
 			/>
@@ -349,18 +349,22 @@
 					>
 						Raw {editor.changeCount > 0 ? '(preview)' : ''}
 					</button>
-					<div class="comment-modes" role="group" aria-label="Comment display">
-						<span class="modes-label">Comments</span>
-						{#each [['full', 'Full'], ['brief', 'Brief'], ['off', 'Off']] as [mode, text] (mode)}
-							<button
-								type="button"
-								class:on={prefs.comments === mode}
-								aria-pressed={prefs.comments === mode}
-								onclick={() => prefs.setComments(mode as CommentMode)}>{text}</button
-							>
-						{/each}
-					</div>
+					<!-- Plain JSON cannot carry comments, so the control has nothing to do. -->
+					{#if editor.format.commentMarker}
+						<div class="comment-modes" role="group" aria-label="Comment display">
+							<span class="modes-label">Comments</span>
+							{#each [['full', 'Full'], ['brief', 'Brief'], ['off', 'Off']] as [mode, text] (mode)}
+								<button
+									type="button"
+									class:on={prefs.comments === mode}
+									aria-pressed={prefs.comments === mode}
+									onclick={() => prefs.setComments(mode as CommentMode)}>{text}</button
+								>
+							{/each}
+						</div>
+					{/if}
 
+					<span class="format-badge">{editor.format.label}</span>
 					<span class="file-name" title={editor.openPath}>{editor.openPath}</span>
 				</div>
 
@@ -379,10 +383,11 @@
 		</div>
 	{:else if !editor.parseError}
 		<div class="empty-state">
-			<h1>Edit a TOML file as a form</h1>
+			<h1>Edit a config file as a form</h1>
 			<p>
-				Point the editor at a <code>.toml</code> file on this machine. Every key becomes an input,
-				grouped exactly as the file groups them, with the comments kept alongside.
+				Point the editor at a <code>.toml</code>, <code>.json</code>, <code>.jsonc</code> or
+				<code>.yaml</code> file on this machine. Every key becomes an input, grouped exactly as the
+				file groups them, with the comments kept alongside.
 			</p>
 			<p class="fine">
 				Saving rewrites only the values you changed, so comments, ordering and spacing stay as they
@@ -704,8 +709,20 @@
 		color: var(--accent);
 	}
 
+	.format-badge {
+		flex: none;
+		margin-left: auto;
+		padding: 0.05rem 0.35rem;
+		border-radius: var(--radius-control);
+		background: var(--badge-bg);
+		color: var(--badge-fg);
+		font-family: var(--mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.02em;
+	}
+
 	.file-name {
-		flex: 1;
+		flex: 0 1 auto;
 		min-width: 0;
 		text-align: right;
 		color: var(--fg-faint);

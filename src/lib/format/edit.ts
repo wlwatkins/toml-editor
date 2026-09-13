@@ -1,13 +1,13 @@
-import type { Span, TomlDocument, ValueNode } from './ast.ts';
-import type { Drafts } from './serialize.ts';
+import type { Document, Span, StringStyle, ValueNode } from './ast.ts';
+import type { Drafts, Format, RenderContext } from './drafts.ts';
 import {
+	contextFor,
+	draftContext,
 	lineIndent,
 	renderValue,
 	sameItems,
-	serializeDraft,
-	subtreeDirty,
-	validateDraft
-} from './serialize.ts';
+	subtreeDirty
+} from './drafts.ts';
 
 export interface Edit {
 	span: Span;
@@ -29,9 +29,10 @@ export interface EditPlan {
  * An array whose item list changed is re-rendered as a whole, since there is no
  * original text for the items that were just added.
  */
-export function collectEdits(doc: TomlDocument, drafts: Drafts): EditPlan {
+export function collectEdits(doc: Document, drafts: Drafts, format: Format): EditPlan {
 	const edits: Edit[] = [];
 	const errors: Record<number, string> = {};
+	const ctx: RenderContext = contextFor(doc, drafts, format);
 	const source = doc.source;
 
 	const validateSubtree = (node: ValueNode) => {
@@ -45,7 +46,7 @@ export function collectEdits(doc: TomlDocument, drafts: Drafts): EditPlan {
 		}
 		const draft = drafts.scalars[node.id];
 		if (draft === undefined) return;
-		const error = validateDraft(node, draft);
+		const error = format.validateDraft(node, draft);
 		if (error) errors[node.id] = error;
 	};
 
@@ -57,7 +58,8 @@ export function collectEdits(doc: TomlDocument, drafts: Drafts): EditPlan {
 				// The whole array is rewritten, so nothing inside it needs its own edit.
 				validateSubtree(node);
 				if (node.span) {
-					edits.push({ span: node.span, text: renderValue(node, drafts, source, indent) });
+					const at = lineIndent(source, node.span.start);
+					edits.push({ span: node.span, text: renderValue(node, ctx, at) });
 				}
 				return;
 			}
@@ -71,15 +73,14 @@ export function collectEdits(doc: TomlDocument, drafts: Drafts): EditPlan {
 
 		const draft = drafts.scalars[node.id];
 		if (draft === undefined || !node.span) return;
-		const error = validateDraft(node, draft);
+		const error = format.validateDraft(node, draft);
 		if (error) {
 			errors[node.id] = error;
 			return;
 		}
-		const text = serializeDraft(node, draft);
-		if (text !== source.slice(node.span.start, node.span.end)) {
-			edits.push({ span: node.span, text });
-		}
+		const dc = draftContext(node, source, indent);
+		const text = format.serializeDraft(node, draft, dc);
+		if (text !== dc.original) edits.push({ span: node.span, text });
 	};
 
 	for (const table of doc.tables) {
@@ -106,8 +107,8 @@ export function applyEdits(source: string, edits: Edit[]): string {
 }
 
 /** Convenience wrapper: drafts in, new file text out. */
-export function applyDrafts(doc: TomlDocument, drafts: Drafts): string {
-	return applyEdits(doc.source, collectEdits(doc, drafts).edits);
+export function applyDrafts(doc: Document, drafts: Drafts, format: Format): string {
+	return applyEdits(doc.source, collectEdits(doc, drafts, format).edits);
 }
 
 let syntheticId = -1;
@@ -122,13 +123,7 @@ export function makeItem(template: ValueNode | undefined): ValueNode {
 
 	switch (template.kind) {
 		case 'string':
-			return {
-				id,
-				kind: 'string',
-				value: '',
-				style: template.style === 'literal' ? 'literal' : 'basic',
-				span: null
-			};
+			return { id, kind: 'string', value: '', style: blankStyle(template.style), span: null };
 		case 'integer':
 			return { id, kind: 'integer', raw: '0', value: 0, span: null };
 		case 'float':
@@ -137,13 +132,18 @@ export function makeItem(template: ValueNode | undefined): ValueNode {
 			return { id, kind: 'boolean', value: false, span: null };
 		case 'datetime':
 			return { id, kind: 'datetime', sub: template.sub, raw: blankDateTime(template.sub), span: null };
+		case 'literal':
+			// A new item modelled on `null` starts out null; one modelled on an
+			// alias cannot be reproduced, so it starts out null too.
+			return { id, kind: 'literal', raw: 'null', label: 'null', editable: true, span: null };
 		case 'array':
-			return { id, kind: 'array', items: [], multiline: false, span: null };
+			return { id, kind: 'array', items: [], multiline: false, flow: template.flow, span: null };
 		case 'inline-table':
 			return {
 				id,
 				kind: 'inline-table',
 				span: null,
+				flow: template.flow,
 				entries: template.entries.map((entry) => ({
 					id: syntheticId--,
 					key: entry.key,
@@ -156,6 +156,27 @@ export function makeItem(template: ValueNode | undefined): ValueNode {
 					path: entry.path
 				}))
 			};
+	}
+}
+
+/** A new string keeps the quoting family of its template, but never its length. */
+function blankStyle(style: StringStyle): StringStyle {
+	switch (style) {
+		case 'literal':
+		case 'multiline-literal':
+			return 'literal';
+		case 'json':
+			return 'json';
+		case 'single':
+			return 'single';
+		case 'double':
+		case 'block-literal':
+		case 'block-folded':
+			return 'double';
+		case 'plain':
+			return 'plain';
+		default:
+			return 'basic';
 	}
 }
 
@@ -177,10 +198,11 @@ function blankDateTime(sub: 'offset' | 'local' | 'date' | 'time'): string {
 }
 
 /** True when any draft differs from the source. */
-export function hasChanges(doc: TomlDocument, drafts: Drafts): boolean {
+export function hasChanges(doc: Document, drafts: Drafts, format: Format): boolean {
+	const ctx = contextFor(doc, drafts, format);
 	for (const table of doc.tables) {
 		for (const entry of table.entries) {
-			if (subtreeDirty(entry.value, drafts, doc.source)) return true;
+			if (subtreeDirty(entry.value, ctx)) return true;
 		}
 	}
 	return false;

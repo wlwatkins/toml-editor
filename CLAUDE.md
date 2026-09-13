@@ -2,8 +2,13 @@
 
 ## Project
 
-`toml-editor` — a local SvelteKit app that renders a TOML file on disk as a web
-form and writes edits back to it. See README.md for user-facing behaviour.
+`toml-editor` — a local SvelteKit app that renders a config file on disk as a
+web form and writes edits back to it. TOML, JSON, JSONC and YAML. See README.md
+for user-facing behaviour.
+
+The name is TOML-only for historical reasons and is load-bearing: the installer
+name, `build.publish` and `app-update.yml` all agree on `toml-editor`, and the
+self-update path breaks quietly if they stop agreeing. Do not rename it casually.
 
 Not a git repository.
 
@@ -19,8 +24,10 @@ npm run dev          # vite dev server only
 npm run electron     # build, then run the app against the built bundle
 npm run dist         # installer -> release/ (build.ps1 wraps this)
 npm run check        # svelte-kit sync + svelte-check -- the type/lint gate
-npm test             # both unit suites -- run this one
-npm run test:toml    # round-trip tests for src/lib/toml/ (node type-stripping)
+npm test             # all four unit suites -- run this one
+npm run test:toml    # round-trip tests for TOML (node type-stripping)
+npm run test:json    # round-trip tests for JSON and JSONC
+npm run test:yaml    # round-trip tests for YAML
 npm run test:md      # comment Markdown renderer + its escaping guarantees
 npm run build        # production build
 npm run preview      # serve the production build
@@ -34,11 +41,12 @@ or `npm run lint`.
 
 ## The core invariant
 
-Saving must not reformat the file. `src/lib/toml/` exists to guarantee that:
+Saving must not reformat the file. `src/lib/format/` plus a parser per format
+exists to guarantee that:
 
-- `parse.ts` records a `Span` (character offsets into the original source) on
-  every value node, plus the comments attached to each key and table header.
-- `edit.ts#collectEdits` walks the drafts and emits the **smallest set of
+- Each parser records a `Span` (character offsets into the original source) on
+  every value node, plus the comments attached to each key and section.
+- `format/edit.ts#collectEdits` walks the drafts and emits the **smallest set of
   replacements** that expresses them. An untouched value is never re-serialised,
   so comments, key order, blank lines, `2_500`-style number formatting, quoting
   style and alignment all survive byte for byte.
@@ -46,28 +54,89 @@ Saving must not reformat the file. `src/lib/toml/` exists to guarantee that:
 - Arrays are the one exception: when the item list changes length or order the
   whole array is re-rendered, since new items have no original text.
 
-`npm run test:toml` pins this down — notably "only the edited line changes" and
-"no drafts rewrites nothing". If you touch the TOML layer, keep those passing;
-they are the difference between this tool and one that mangles configs.
+Each format's test suite pins this down — notably "only the edited line
+changes" and "no drafts rewrites nothing". If you touch a format layer, keep
+those passing; they are the difference between this tool and one that mangles
+configs.
 
-The test normalises `examples/sample.toml` to LF as it loads it. With
-`core.autocrlf=true` the fixture is checked out with CRLF, which put `\r\n`
+Every suite normalises its fixture to LF as it loads it. With
+`core.autocrlf=true` the fixtures are checked out with CRLF, which put `\r\n`
 in the multi-line string expectation and made the CRLF test double up the
-carriage returns. Keep that normalisation; the CRLF case is built from it.
+carriage returns. Keep that normalisation; the CRLF cases are built from it.
 
 Drafts live in `Drafts { scalars, arrays }`, keyed by node id, and only exist
 once a field is actually touched — a *missing* entry is what means "untouched".
 Preserve that distinction; seeding drafts eagerly would rewrite the whole file.
 
+## Formats
+
+The document model, the draft bookkeeping and the edit planner are shared. A
+format supplies only its own parser and its own value syntax, through the
+`Format` interface in `src/lib/format/drafts.ts`. To add one, write
+`parse.ts` + `serialize.ts` under `src/lib/<id>/`, export a `Format`, and add
+it to `FORMATS` in `registry.ts` — that alone widens the path guards in
+`api/file`, the picker filters and the editor. `electron/main.cjs` keeps its
+own copy of the extension list, because a `.cjs` file cannot import the TS.
+
+Things that are the way they are on purpose:
+
+- **The model is TOML-shaped**: tables of entries, because that is what the
+  form renders. JSON and YAML map onto it — an object/mapping reached from a
+  table becomes a table of its own, and one reached from inside an array stays
+  an inline table (a list of records, not a section). An object written on one
+  line stays a single field: `flow` on the node is what decides, and a JSON
+  object gets `flow` set from whether its source spans a newline.
+- **A table with no entries of its own is dropped** from the list unless it
+  carries comments; its children already carry the full dotted path, so an
+  empty card would be noise.
+- **`LiteralNode` covers everything edited as raw text**: `null`, YAML's `~`,
+  and things that can be shown but not safely rewritten (an alias, a tagged
+  node), which set `editable: false`. That one kind is why adding null support
+  did not need a new branch everywhere.
+- **`serializeDraft` gets a `DraftContext`** holding the value's own indent and
+  its original text. YAML block scalars need both; TOML and JSON ignore it.
+- **`Format.reindent` is opt-in.** Text reused at a new depth has to move with
+  it in JSON and YAML, but TOML must *not* have it — shifting the lines of a
+  multi-line string would change the string. The two formats anchor differently:
+  JSON from `lineIndent` (the start of the value's line), YAML from
+  `columnIndent` (the column the value itself begins at, which in `- name: x`
+  is two past the dash). Getting this wrong shows up as items drifting right
+  every time an array is reordered.
+
+YAML is read with the **`yaml` package**, not a parser of our own: its node
+tree already carries a source range per node, which is exactly what the edit
+planner needs, and YAML 1.2 by hand is not a weekend's job. Notes on it:
+
+- `node.range` is `[start, valueEnd, nodeEnd]`. The span is `[0]`..`[1]`, with
+  trailing newlines trimmed off — a block scalar's `valueEnd` runs past the
+  final line break, and replacing that break too would eat the layout.
+- An **anchor is not inside the node's range**, so `spanOf` widens the span
+  backwards over `&name` when there is one. Without that, moving an anchored
+  item inside a reordered sequence silently drops the anchor.
+- Leading comments arrive as one string on the *key* node's `commentBefore`,
+  with blank lines as empty lines; they are split into blocks the same way the
+  TOML reader does, last block attached and the rest detached.
+- A **plain scalar is re-quoted on save when the new text would read back as
+  something else** (`2`, `true`, `~`). `isPlainSafe` is what stops a string
+  field quietly turning into a number.
+- An edited **folded** block (`>`) is written back as a **literal** block (`|`):
+  re-folding would move the line breaks. Chomping (`|` vs `|-`) is derived from
+  whether the value ends in a newline, not copied from the original header.
+- **Multi-document files are refused**, not half-supported.
+
 ## Layout
 
 ```
-src/lib/toml/            plain TS, no Svelte import -- keep it that way so the
-                         node --experimental-strip-types tests can run
-  ast.ts                 node types, spans, type labels
-  parse.ts               TOML 1.0 parser (spans + comments)
-  serialize.ts           value -> text, quoting styles, draft validation
+src/lib/format/          plain TS, no Svelte import -- keep it that way so the
+                         node --experimental-strip-types tests can run. Shared
+                         by every format.
+  ast.ts                 node types, spans, type labels, ParseError
+  drafts.ts              Drafts, the Format interface, renderValue, indents
   edit.ts                drafts -> patches; synthetic nodes for new array items
+  registry.ts            the format list; formatForPath(), EXTENSIONS
+src/lib/toml/            parse.ts (TOML 1.0) + serialize.ts (exports `toml`)
+src/lib/json/            parse.ts (JSON + JSONC) + serialize.ts (`json`,`jsonc`)
+src/lib/yaml/            parse.ts (via the `yaml` package) + serialize.ts
 src/lib/markdown.ts      comment Markdown renderer; escape-then-generate only
 src/lib/prefs.svelte.ts  remembered UI preferences (comment display mode)
 src/lib/editor.svelte.ts Editor class: open/save, drafts, derived edit plan
@@ -80,6 +149,7 @@ src/lib/platform.ts      the seam: Electron IPC when present, else fetch /api
 src/lib/components/TitleBar.svelte   custom frameless chrome (menus + buttons)
 electron/main.cjs        window, IPC, app:// protocol, dev-URL mode
 electron/preload.cjs     the whole privileged surface, via contextBridge
+scripts/*-roundtrip-test.ts  one suite per format; scripts/markdown-test.ts
 scripts/package.mjs      installer build; stages outside the project (see below)
 scripts/menu.ps1         the menu, and the verb dispatch behind run.cmd
 scripts/run.ps1          debug mode
@@ -116,9 +186,14 @@ walking the AST has to handle that.
 - Beware `$effect` that reads state it also writes — it re-triggers itself. The
   page's session restore uses `onMount` for exactly this reason.
 - `$state.raw` is used for `doc` and `arrays` so the AST is not deep-proxied.
-- Import extensions: relative imports inside `src/lib/toml/` use explicit `.ts`
-  (required by `rewriteRelativeImportExtensions` and by the node test runner).
+- Import extensions: relative imports inside `src/lib/format/`, `toml/`, `json/`
+  and `yaml/` use explicit `.ts`, including the ones that cross between those
+  directories (`../format/ast.ts`) — required by
+  `rewriteRelativeImportExtensions` and by the node test runner.
   `$lib/...` imports must be **extensionless** — TS only rewrites relative paths.
+- `yaml` is the one runtime dependency of the format layer. It bundles into the
+  client build, so the packaged Electron app needs nothing extra; keep it out of
+  everything else so the rest stays dependency-free plain TS.
 - Svelte 5, SvelteKit 2, Vite 8, TypeScript 6 (`strict`, `checkJs`),
   `@types/node` for the server routes, and `adapter-static` with an
   `index.html` fallback -- `npm run build` emits a SPA into `build/`, which is
@@ -128,6 +203,10 @@ walking the AST has to handle that.
 
 ## Comments
 
+The marker differs by format (`#`, `//`); `Format.commentMarker` carries it,
+and `null` means the format has none, which is what hides the Comments control
+for plain JSON. `EntryRow` passes it to CSS as `--marker`.
+
 Comments render as Markdown through `src/lib/markdown.ts`, injected with
 `{@html}`. That is only safe because the renderer **escapes the text before it
 generates a single tag**, and emits nothing outside a fixed tag set. Do not
@@ -135,7 +214,8 @@ reorder those steps, and do not swap in an npm Markdown library without
 checking it cannot emit raw HTML -- comment text is arbitrary file content.
 `npm run test:md` asserts the tag and attribute allowlists directly.
 
-`parse.ts` strips the `#` and at most **one** following space. The remaining
+`stripCommentMarker` in `format/ast.ts` strips at most **one** leading space
+after the marker — every parser routes through it. The remaining
 indentation is load-bearing: nested lists and indented code blocks depend on
 it, so do not reintroduce a `.trim()` there.
 
@@ -349,8 +429,13 @@ PowerShell specifics that bit:
 
 ## Gotchas
 
-- Server routes refuse any path that is not `.toml`/`.tml`, on both read and
-  write. Keep that guard — it is what stops a typo overwriting an unrelated file.
+- Server routes refuse any extension no format claims, on both read and write.
+  Keep that guard — it is what stops a typo overwriting an unrelated file. The
+  list comes from `registry.ts` in the route and is hand-mirrored in
+  `electron/main.cjs`; they have to stay in step.
+- `fileAssociations` in package.json deliberately still claims **only `.toml`**.
+  Claiming `.json` or `.yaml` on install would hijack extensions other editors
+  own, which is not ours to do quietly.
 - `/api/pick` passes the starting directory through the child process's
   environment rather than interpolating it into a command line. Do not tidy
   that into string concatenation.

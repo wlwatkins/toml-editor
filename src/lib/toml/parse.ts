@@ -1,26 +1,13 @@
 import type {
 	ArrayNode,
+	Document,
 	Entry,
 	InlineTableNode,
 	StringNode,
 	TableNode,
-	TomlDocument,
 	ValueNode
-} from './ast.ts';
-
-export class TomlParseError extends Error {
-	offset: number;
-	line: number;
-	column: number;
-
-	constructor(message: string, offset: number, line: number, column: number) {
-		super(`${message} (line ${line}, column ${column})`);
-		this.name = 'TomlParseError';
-		this.offset = offset;
-		this.line = line;
-		this.column = column;
-	}
-}
+} from '../format/ast.ts';
+import { parseErrorAt, stripCommentMarker } from '../format/ast.ts';
 
 const BARE_KEY = /[A-Za-z0-9_-]/;
 
@@ -60,7 +47,7 @@ class Parser {
 		this.tables.push(this.current);
 	}
 
-	parse(): TomlDocument {
+	parse(): Document {
 		for (;;) {
 			this.skipTrivia();
 			if (this.eof()) break;
@@ -101,17 +88,7 @@ class Parser {
 	}
 
 	private fail(message: string, at = this.i): never {
-		let line = 1;
-		let column = 1;
-		for (let k = 0; k < at && k < this.src.length; k++) {
-			if (this.src[k] === '\n') {
-				line++;
-				column = 1;
-			} else {
-				column++;
-			}
-		}
-		throw new TomlParseError(message, at, line, column);
+		throw parseErrorAt(this.src, message, at);
 	}
 
 	private tryRe(re: RegExp): string | null {
@@ -530,15 +507,6 @@ class Parser {
 	}
 }
 
-/**
- * Turns the text after a `#` into comment content. A single leading space is
- * conventional padding and comes off; anything beyond that is indentation the
- * author chose, and Markdown rendering depends on it surviving.
- */
-function stripCommentMarker(text: string): string {
-	return (text.startsWith(' ') ? text.slice(1) : text).replace(/\s+$/, '');
-}
-
 function floatValue(raw: string): number {
 	const clean = raw.replace(/_/g, '');
 	if (/inf$/.test(clean)) return clean.startsWith('-') ? -Infinity : Infinity;
@@ -550,6 +518,6 @@ function intValue(raw: string): number {
 	return Number(raw.replace(/_/g, ''));
 }
 
-export function parseToml(source: string): TomlDocument {
+export function parseToml(source: string): Document {
 	return new Parser(source).parse();
 }

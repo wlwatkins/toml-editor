@@ -1,7 +1,10 @@
-import type { ArrayNode, ScalarNode, TomlDocument, ValueNode } from './toml/ast.ts';
-import { parseToml, TomlParseError } from './toml/parse.ts';
-import { applyEdits, collectEdits, makeItem } from './toml/edit.ts';
-import { originalDraft, type Drafts } from './toml/serialize.ts';
+import type { ArrayNode, Document, ScalarNode, ValueNode } from './format/ast.ts';
+import { ParseError } from './format/ast.ts';
+import type { Drafts, Format } from './format/drafts.ts';
+import { originalDraft } from './format/drafts.ts';
+import { applyEdits, collectEdits, makeItem } from './format/edit.ts';
+import { extensionList, formatForPath } from './format/registry.ts';
+import { toml } from './toml/serialize.ts';
 import { readFile, writeFile } from './platform.ts';
 
 export interface Status {
@@ -17,13 +20,17 @@ const MAX_RECENTS = 8;
  *
  * Drafts are keyed by node id and only exist once a field is actually touched,
  * which is what lets an untouched part of the file be written back verbatim.
+ *
+ * The format is chosen from the file's extension when it is opened and then
+ * stays put, so that parsing, validating and saving all agree.
  */
 export class Editor {
 	/** Path currently typed into the location bar (not necessarily open). */
 	pathInput = $state('');
 	/** Path of the document that is actually open. */
 	openPath = $state('');
-	doc = $state.raw<TomlDocument | null>(null);
+	doc = $state.raw<Document | null>(null);
+	format = $state.raw<Format>(toml);
 	parseError = $state<string | null>(null);
 	mtimeMs = $state(0);
 	busy = $state(false);
@@ -38,7 +45,7 @@ export class Editor {
 	plan = $derived.by(() => {
 		const doc = this.doc;
 		if (!doc) return { edits: [], errors: {} };
-		return collectEdits(doc, this.drafts);
+		return collectEdits(doc, this.drafts, this.format);
 	});
 
 	errorCount = $derived(Object.keys(this.plan.errors).length);
@@ -134,12 +141,23 @@ export class Editor {
 		this.openPath = label;
 		this.pathInput = label;
 		this.mtimeMs = 0;
-		this.doc = parseToml(text);
+		this.format = formatForPath(label) ?? toml;
+		this.doc = this.format.parse(text);
 	}
 
 	async open(path: string) {
 		const target = path.trim();
 		if (!target) return;
+
+		const format = formatForPath(target);
+		if (!format) {
+			this.status = {
+				kind: 'error',
+				text: `Cannot tell what kind of file that is. Expected one of: ${extensionList()}`
+			};
+			return;
+		}
+
 		this.busy = true;
 		this.status = null;
 		try {
@@ -151,13 +169,17 @@ export class Editor {
 			this.openPath = payload.path;
 			this.pathInput = payload.path;
 			this.mtimeMs = payload.mtimeMs;
+			// The server may have resolved the path; trust its extension over ours.
+			this.format = formatForPath(payload.path) ?? format;
 
 			try {
-				this.doc = parseToml(payload.text);
+				this.doc = this.format.parse(payload.text);
 			} catch (cause) {
 				this.doc = null;
 				this.parseError =
-					cause instanceof TomlParseError ? cause.message : `Could not parse file: ${String(cause)}`;
+					cause instanceof ParseError
+						? `${this.format.label}: ${cause.message}`
+						: `Could not parse file: ${String(cause)}`;
 				return;
 			}
 			this.remember(payload.path);
@@ -189,7 +211,7 @@ export class Editor {
 
 			const written = this.changeCount;
 			// Re-parse from the saved text so spans line up with the new file.
-			this.doc = parseToml(text);
+			this.doc = this.format.parse(text);
 			this.scalars = {};
 			this.arrays = {};
 			this.mtimeMs = payload.mtimeMs;

@@ -19,7 +19,9 @@ const BUILD_DIR = path.join(__dirname, '..', 'build');
  * the built bundle, so edits hot-reload, and DevTools opens with it.
  */
 const DEV_URL = process.env.TOML_EDITOR_DEV_URL;
-const ALLOWED_EXTENSIONS = new Set(['.toml', '.tml']);
+// Kept in step with src/lib/format/registry.ts by hand: a .cjs preload cannot
+// import the TypeScript module, and this is the guard on the disk side.
+const ALLOWED_EXTENSIONS = new Set(['.toml', '.tml', '.json', '.jsonc', '.yaml', '.yml']);
 const SCHEME = 'app';
 
 let mainWindow = null;
@@ -40,12 +42,12 @@ function fileFromArgv(argv) {
 	return candidate ? path.resolve(candidate) : null;
 }
 
-/** Rejects anything that is not a TOML file, so a typo cannot clobber a file. */
+/** Rejects any extension no format claims, so a typo cannot clobber a file. */
 function checkPath(value) {
 	if (typeof value !== 'string' || !value.trim()) throw new Error('No file path given');
 	const resolved = path.resolve(value.trim());
 	if (!ALLOWED_EXTENSIONS.has(path.extname(resolved).toLowerCase())) {
-		throw new Error('Only .toml and .tml files can be opened');
+		throw new Error(`Only these files can be opened: ${[...ALLOWED_EXTENSIONS].join(', ')}`);
 	}
 	return resolved;
 }
@@ -108,10 +110,13 @@ handle('toml:write', async (input) => {
 
 handle('toml:pick', async (startDir) => {
 	const options = {
-		title: 'Open a TOML file',
+		title: 'Open a config file',
 		properties: ['openFile'],
 		filters: [
-			{ name: 'TOML files', extensions: ['toml', 'tml'] },
+			{ name: 'Config files', extensions: ['toml', 'tml', 'json', 'jsonc', 'yaml', 'yml'] },
+			{ name: 'TOML', extensions: ['toml', 'tml'] },
+			{ name: 'JSON', extensions: ['json', 'jsonc'] },
+			{ name: 'YAML', extensions: ['yaml', 'yml'] },
 			{ name: 'All files', extensions: ['*'] }
 		]
 	};

@@ -4,12 +4,12 @@
 
 # TOML Editor
 
-**Edit a TOML file as a form. Save it back without touching a byte you didn't change.**
+**Edit a TOML, JSON, JSONC or YAML file as a form. Save it back without touching a byte you didn't change.**
 
 [![Latest release](https://img.shields.io/github/v/release/wlwatkins/toml-editor?label=release&color=00e5ff&labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/wlwatkins/toml-editor/total?color=00e5ff&labelColor=0a0a0a)](https://github.com/wlwatkins/toml-editor/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-00e5ff?labelColor=0a0a0a)](#installing-it)
-[![TOML 1.0](https://img.shields.io/badge/TOML-1.0-00e5ff?labelColor=0a0a0a)](https://toml.io/en/v1.0.0)
+[![Formats](https://img.shields.io/badge/TOML%20%C2%B7%20JSON%20%C2%B7%20JSONC%20%C2%B7%20YAML-supported-00e5ff?labelColor=0a0a0a)](#what-you-can-edit)
 [![Runs offline](https://img.shields.io/badge/runs-100%25%20local-00e5ff?labelColor=0a0a0a)](#private-by-construction)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-00e5ff?labelColor=0a0a0a)](LICENSE)
 
@@ -42,6 +42,11 @@ TOML Editor does not rebuild the file. It records where every value sits in
 the original text and, on save, **replaces only the characters of the values
 you changed**. Edit two fields in a 400-line config and you get a two-line diff.
 
+It does this for **TOML, JSON, JSON with comments and YAML**. The format comes
+from the file's extension, and each keeps its own conventions: TOML keeps
+`2_500` and its quoting styles, JSON keeps your indentation, YAML keeps block
+scalars, flow versus block style, and anchors.
+
 ## Features
 
 - **The right control for every key.** Text boxes, number fields, toggles,
@@ -58,9 +63,12 @@ you changed**. Edit two fields in a 400-line config and you get a two-line diff.
   blocks saving, so the file never receives something that will not parse.
 - **Raw view before you commit.** The **Raw** tab shows the exact text Save will
   write.
+- **Four formats, one editor.** `.toml`, `.tml`, `.json`, `.jsonc`, `.yaml` and
+  `.yml`. The format is chosen from the extension and shown in the toolbar; the
+  form, the comments and the surgical save work the same way in all of them.
 - **Safe on disk.** Writes are atomic, external edits are detected and refused
-  with a conflict message, and only `.toml`/`.tml` paths can be opened or
-  written, so a mistyped path fails loudly rather than clobbering something else.
+  with a conflict message, and only those extensions can be opened or written,
+  so a mistyped path fails loudly rather than clobbering something else.
 - **A proper desktop app.** Frameless window, native Open dialog, an
   "open with" entry for `.toml` files, and a file path accepted on the command
   line.
@@ -113,17 +121,27 @@ Passing a file on the command line works on every platform:
 
 ## What you can edit
 
-| TOML                     | Control                                        |
-| ------------------------ | ---------------------------------------------- |
-| String                   | Text box, or a textarea for multi-line values  |
-| Integer / float          | Number input (text, for hex/octal/underscored) |
-| Boolean                  | Toggle                                         |
-| Local date / time        | Native date and time pickers                   |
-| Local date-time          | Native date-time picker                        |
-| Offset date-time         | Text box (no browser control keeps the zone)   |
-| Array                    | List editor: edit, reorder and add/remove items |
-| Inline table `{ a = 1 }` | Nested fields, patched in place                |
-| `[table]`, `[[array]]`   | A section card each, nested by path depth      |
+| Value                    | Control                                         |
+| ------------------------ | ----------------------------------------------- |
+| String                   | Text box, or a textarea for multi-line values   |
+| Integer / float          | Number input (text, for hex/octal/underscored)  |
+| Boolean                  | Toggle                                          |
+| Local date / time        | Native date and time pickers (TOML)             |
+| Local date-time          | Native date-time picker (TOML)                  |
+| Offset date-time         | Text box (no browser control keeps the zone)    |
+| `null`, `~`              | Text box taking any single value of that format |
+| Array / sequence         | List editor: edit, reorder and add/remove items |
+| One-line table or object | Nested fields, patched in place                 |
+| Nested table or mapping  | A section card each, nested by path depth       |
+
+### Per format
+
+| Format | Extensions | Notes |
+| --- | --- | --- |
+| TOML | `.toml`, `.tml` | `[table]` and `[[array]]` headers become sections. Number formatting (`2_500`, `0xff`) and every quoting style survive. |
+| JSON | `.json` | Strict: no comments, no trailing commas. A nested object becomes a section; an object written on one line stays a single field. Your indentation width is read back from the file and reused. |
+| JSONC | `.jsonc` | JSON plus `//` and `/* */` comments and trailing commas. Comments are attached and rendered like TOML's. |
+| YAML | `.yaml`, `.yml` | Block and flow style are each kept as written, along with block scalars (`|`, `>`), quoting style, and comments. A plain string that would read back as a number, a boolean or `null` is quoted on save so its type cannot drift. |
 
 **Close** (File -> Close file, or Ctrl+W) puts the editor back to its empty
 state. With unsaved changes it asks first, naming how many would be lost; the
@@ -135,16 +153,22 @@ Adding or removing **keys and sections**. The form edits the values of what is
 already in the file; array items are the exception and can be added and
 removed. Restructuring a file is still a text-editor job.
 
+In YAML specifically: a file holding **several documents** separated by `---`
+is refused rather than edited, and an **alias** (`*ref`, including a `<<` merge
+key) is shown but read-only — rewriting the reference in one place would not
+change what it points at.
+
 ## What saving actually does
 
-The parser turns TOML into a tree where every value remembers its exact
+The parser turns the file into a tree where every value remembers its exact
 character range in the original text. A save replaces **only the ranges whose
 values you changed**. Everything else survives byte for byte:
 
 - comments, both on their own line and trailing a value
 - key order, blank lines and section order
 - number formatting such as `2_500`, `0xff`, `1e6`
-- quoting style: `'literal'` stays literal, `"""multi-line"""` stays multi-line
+- quoting style: `'literal'` stays literal, `"""multi-line"""` stays multi-line,
+  a YAML block scalar stays a block scalar at the same indentation
 - your alignment, e.g. `host = "127.0.0.1"   # bind address`
 
 A value edited back to its original text produces no change at all. Arrays are
@@ -178,6 +202,9 @@ supported subset is headings (`##` in the file, since the first `#` is the
 comment marker), the rule-title-rule banner style above, bullet and numbered
 lists, block quotes, fenced and indented code, and inline code, **bold**,
 *italic*, ~~strikethrough~~ and links.
+
+The same applies to YAML's `#` comments and to JSONC's `//` and `/* */` ones.
+Plain JSON has no comments, so the **Comments** control is hidden for it.
 
 Any block longer than two lines gets a disclosure triangle. The **Comments**
 control in the toolbar sets the default for the whole file, and the choice is

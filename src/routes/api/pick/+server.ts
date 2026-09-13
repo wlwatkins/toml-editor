@@ -21,8 +21,8 @@ const DIALOG_TIMEOUT_MS = 5 * 60 * 1000;
 const WINDOWS_SCRIPT = `
 Add-Type -AssemblyName System.Windows.Forms | Out-Null
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'Open a TOML file'
-$dialog.Filter = 'TOML files (*.toml;*.tml)|*.toml;*.tml|All files (*.*)|*.*'
+$dialog.Title = 'Open a config file'
+$dialog.Filter = 'Config files|*.toml;*.tml;*.json;*.jsonc;*.yaml;*.yml|TOML (*.toml;*.tml)|*.toml;*.tml|JSON (*.json;*.jsonc)|*.json;*.jsonc|YAML (*.yaml;*.yml)|*.yaml;*.yml|All files (*.*)|*.*'
 $dialog.Multiselect = $false
 $start = $env:TOML_PICKER_DIR
 if ($start -and (Test-Path -LiteralPath $start)) { $dialog.InitialDirectory = $start }
@@ -38,9 +38,9 @@ const MAC_SCRIPT = `
 set startDir to system attribute "TOML_PICKER_DIR"
 try
     if startDir is not "" then
-        set chosen to choose file with prompt "Open a TOML file" default location (POSIX file startDir)
+        set chosen to choose file with prompt "Open a config file" default location (POSIX file startDir)
     else
-        set chosen to choose file with prompt "Open a TOML file"
+        set chosen to choose file with prompt "Open a config file"
     end if
 on error number -128
     return ""
@@ -72,8 +72,11 @@ function dialogFor(platform: string): Dialog | null {
 				command: 'zenity',
 				args: [
 					'--file-selection',
-					'--title=Open a TOML file',
-					'--file-filter=TOML files | *.toml *.tml',
+					'--title=Open a config file',
+					'--file-filter=Config files | *.toml *.tml *.json *.jsonc *.yaml *.yml',
+					'--file-filter=TOML | *.toml *.tml',
+					'--file-filter=JSON | *.json *.jsonc',
+					'--file-filter=YAML | *.yaml *.yml',
 					'--file-filter=All files | *'
 				]
 			};

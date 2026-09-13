@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ArrayNode, InlineTableNode, ScalarNode, ValueNode } from '$lib/toml/ast';
-	import { typeLabel } from '$lib/toml/ast';
+	import type { ArrayNode, InlineTableNode, ScalarNode, ValueNode } from '$lib/format/ast';
+	import { typeLabel } from '$lib/format/ast';
 	import type { Editor } from '$lib/editor.svelte';
 	import Self from './ValueField.svelte';
 
@@ -96,6 +96,22 @@
 				<span class="track"><span class="thumb"></span></span>
 				<span class="toggle-text">{editor.valueOf(scalar) ? 'true' : 'false'}</span>
 			</label>
+		{:else if scalar.kind === 'literal' && !scalar.editable}
+			<!--
+				A YAML alias or a tagged node. It is shown so the field is not a
+				mystery, but rewriting the reference here would not change what it
+				points at, so it is not an input.
+			-->
+			<p class="readonly">{scalar.raw}</p>
+		{:else if scalar.kind === 'literal'}
+			<!-- `null` and friends are edited as the literal the file holds. -->
+			<input
+				id={inputId}
+				class="numeric"
+				type="text"
+				value={editor.textOf(scalar)}
+				oninput={(e) => editor.set(scalar, e.currentTarget.value)}
+			/>
 		{:else if usesTextarea(scalar)}
 			<textarea
 				id={inputId}
@@ -227,6 +243,18 @@
 		margin: 0;
 		color: var(--danger);
 		font-size: 0.78rem;
+	}
+
+	/* A value that can be shown but not safely rewritten. */
+	.readonly {
+		margin: 0;
+		padding: 0.4rem 0.55rem;
+		border: 1px dashed var(--border);
+		border-radius: var(--radius-control);
+		color: var(--fg-muted);
+		font-family: var(--mono);
+		font-size: 0.875rem;
+		overflow-wrap: anywhere;
 	}
 
 	/* Boolean toggle */

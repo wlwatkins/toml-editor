@@ -1,21 +1,13 @@
-import type { ScalarNode, StringStyle, ValueNode } from './ast.ts';
-
-/**
- * Pending user edits, keyed by node id.
- *
- * `scalars` holds the editable text (or boolean) for a leaf value; a missing
- * entry means "untouched", which lets us reproduce the original source byte for
- * byte instead of re-serialising it.
- *
- * `arrays` holds a replacement item list for an array whose length or order the
- * user changed.
- */
-export interface Drafts {
-	scalars: Record<number, string | boolean>;
-	arrays: Record<number, ValueNode[]>;
-}
-
-export const emptyDrafts = (): Drafts => ({ scalars: {}, arrays: {} });
+import type {
+	ArrayNode,
+	InlineTableNode,
+	ScalarNode,
+	StringStyle,
+	ValueNode
+} from '../format/ast.ts';
+import type { DraftContext, Format, RenderContext } from '../format/drafts.ts';
+import { renderValue } from '../format/drafts.ts';
+import { parseToml } from './parse.ts';
 
 const RE_DEC_INT = /^[+-]?(0|[1-9](_?[0-9])*)$/;
 const RE_RADIX_INT = /^(0x[0-9A-Fa-f](_?[0-9A-Fa-f])*|0o[0-7](_?[0-7])*|0b[01](_?[01])*)$/;
@@ -26,22 +18,12 @@ const RE_LOCAL_DT_FULL = /^\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 const RE_DATE_FULL = /^\d{4}-\d{2}-\d{2}$/;
 const RE_TIME_FULL = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 
-/** The editable representation of a leaf value, before the user touches it. */
-export function originalDraft(node: ScalarNode): string | boolean {
-	switch (node.kind) {
-		case 'string':
-			return node.value;
-		case 'boolean':
-			return node.value;
-		default:
-			return node.raw;
-	}
-}
-
 /** Returns an error message, or null when the draft is a valid TOML value. */
 export function validateDraft(node: ScalarNode, draft: string | boolean): string | null {
 	if (node.kind === 'boolean') return null;
 	if (node.kind === 'string') return null;
+	// TOML has no null and no aliases, so a literal node never reaches here.
+	if (node.kind === 'literal') return null;
 
 	const text = String(draft).trim();
 	if (text === '') return 'Value is required';
@@ -172,99 +154,53 @@ export function serializeString(value: string, preferred: StringStyle): string {
 	return `"${escapeBasic(value)}"`;
 }
 
-/** Serialises a node straight from its parsed value, ignoring drafts. */
-function serializeNode(node: ValueNode, drafts: Drafts, source: string, indent: string): string {
+/** Serialises a leaf straight from its parsed value, ignoring drafts. */
+function serializeScalar(node: ScalarNode): string {
 	switch (node.kind) {
 		case 'string':
 			return serializeString(node.value, node.style);
 		case 'boolean':
 			return node.value ? 'true' : 'false';
-		case 'integer':
-		case 'float':
-		case 'datetime':
+		default:
 			return node.raw;
-		case 'array':
-			return renderArray(node.multiline, drafts.arrays[node.id] ?? node.items, drafts, source, indent);
-		case 'inline-table':
-			return renderInlineTable(node.entries, drafts, source, indent);
 	}
-}
-
-/** True when anything under `node` has been edited and needs re-rendering. */
-export function subtreeDirty(node: ValueNode, drafts: Drafts, source: string): boolean {
-	if (node.kind === 'array') {
-		const items = drafts.arrays[node.id];
-		if (items && !sameItems(items, node.items)) return true;
-		return (items ?? node.items).some((item) => subtreeDirty(item, drafts, source));
-	}
-	if (node.kind === 'inline-table') {
-		return node.entries.some((entry) => subtreeDirty(entry.value, drafts, source));
-	}
-	const draft = drafts.scalars[node.id];
-	if (draft === undefined) return false;
-	if (!node.span) return true;
-	return serializeDraft(node, draft) !== source.slice(node.span.start, node.span.end);
-}
-
-/** Item lists match when they hold the same nodes in the same order. */
-export function sameItems(a: ValueNode[], b: ValueNode[]): boolean {
-	return a.length === b.length && a.every((item, k) => item.id === b[k].id);
-}
-
-/**
- * Renders a value, reusing the untouched original source wherever possible so
- * that comments, spacing and number formatting survive a save.
- */
-export function renderValue(
-	node: ValueNode,
-	drafts: Drafts,
-	source: string,
-	indent: string
-): string {
-	if (node.span && !subtreeDirty(node, drafts, source)) {
-		return source.slice(node.span.start, node.span.end);
-	}
-	if (node.kind === 'array' || node.kind === 'inline-table') {
-		return serializeNode(node, drafts, source, indent);
-	}
-	const draft = drafts.scalars[node.id];
-	if (draft === undefined) return serializeNode(node, drafts, source, indent);
-	return serializeDraft(node, draft);
 }
 
 function renderArray(
-	multiline: boolean,
+	node: ArrayNode,
 	items: ValueNode[],
-	drafts: Drafts,
-	source: string,
+	ctx: RenderContext,
 	indent: string
 ): string {
 	if (items.length === 0) return '[]';
 	const inner = indent + '  ';
-	const parts = items.map((item) => renderValue(item, drafts, source, inner));
+	const parts = items.map((item) => renderValue(item, ctx, inner));
 	const oneLine = `[${parts.join(', ')}]`;
-	if (!multiline && !oneLine.includes('\n') && oneLine.length + indent.length <= 96) {
+	if (!node.multiline && !oneLine.includes('\n') && oneLine.length + indent.length <= 96) {
 		return oneLine;
 	}
 	return `[\n${parts.map((part) => inner + part).join(',\n')},\n${indent}]`;
 }
 
-function renderInlineTable(
-	entries: { keyRaw: string; value: ValueNode }[],
-	drafts: Drafts,
-	source: string,
-	indent: string
-): string {
-	if (entries.length === 0) return '{}';
-	const parts = entries.map(
-		(entry) => `${entry.keyRaw} = ${renderValue(entry.value, drafts, source, indent)}`
+function renderTable(node: InlineTableNode, ctx: RenderContext, indent: string): string {
+	if (node.entries.length === 0) return '{}';
+	const parts = node.entries.map(
+		(entry) => `${entry.keyRaw} = ${renderValue(entry.value, ctx, indent)}`
 	);
 	return `{ ${parts.join(', ')} }`;
 }
 
-/** The leading whitespace of the line containing `offset`. */
-export function lineIndent(source: string, offset: number): string {
-	const lineStart = source.lastIndexOf('\n', Math.max(0, offset - 1)) + 1;
-	const match = /^[ \t]*/.exec(source.slice(lineStart, offset));
-	return match ? match[0] : '';
-}
+export const toml: Format = {
+	id: 'toml',
+	label: 'TOML',
+	extensions: ['.toml', '.tml'],
+	commentMarker: '#',
+	parse: parseToml,
+	validateDraft,
+	serializeDraft: (node: ScalarNode, draft: string | boolean, _ctx: DraftContext) =>
+		serializeDraft(node, draft),
+	serializeScalar: (node: ScalarNode, _ctx: DraftContext) => serializeScalar(node),
+	renderArray,
+	renderTable
+	// No `reindent`: shifting the lines of a multi-line string would change it.
+};

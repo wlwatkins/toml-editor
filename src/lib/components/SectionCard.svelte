@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TableNode } from '$lib/toml/ast';
+	import type { TableNode } from '$lib/format/ast';
 	import type { Editor } from '$lib/editor.svelte';
 	import EntryRow from './EntryRow.svelte';
 	import CommentBlock from './CommentBlock.svelte';
@@ -9,6 +9,9 @@
 	const title = $derived(table.kind === 'root' ? 'Top level' : table.path.join('.'));
 	// Nested tables sit slightly inside their parent to mirror the file's shape.
 	const depth = $derived(table.kind === 'root' ? 0 : Math.min(table.path.length - 1, 3));
+	// `[section]` is how TOML writes a header; in JSON and YAML a section is
+	// just a nested key, so the brackets would be inventing syntax.
+	const brackets = $derived(editor.format.id === 'toml');
 </script>
 
 <section id={anchor} class="card" style="--depth: {depth}">
@@ -17,11 +20,13 @@
 			<h2>
 				{#if table.kind === 'root'}
 					<span class="root-title">{title}</span>
-				{:else}
+				{:else if brackets}
 					<span class="bracket">{table.kind === 'array-table' ? '[[' : '['}</span
 					><span class="path">{title}</span><span class="bracket"
 						>{table.kind === 'array-table' ? ']]' : ']'}</span
 					>
+				{:else}
+					<span class="path">{title}</span>
 				{/if}
 			</h2>
 			{#if table.kind === 'array-table'}

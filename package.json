@@ -1,7 +1,7 @@
 {
 	"name": "toml-editor",
 	"private": true,
-	"version": "1.0.4",
+	"version": "1.1.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -10,8 +10,10 @@
 		"dist": "npm run build && node scripts/package.mjs",
 		"dist:dir": "npm run build && node scripts/package.mjs --dir",
 		"preview": "vite preview",
-		"test": "npm run test:toml && npm run test:md",
+		"test": "npm run test:toml && npm run test:json && npm run test:yaml && npm run test:md",
 		"test:toml": "node --experimental-strip-types --no-warnings scripts/toml-roundtrip-test.ts",
+		"test:json": "node --experimental-strip-types --no-warnings scripts/json-roundtrip-test.ts",
+		"test:yaml": "node --experimental-strip-types --no-warnings scripts/yaml-roundtrip-test.ts",
 		"test:md": "node --experimental-strip-types --no-warnings scripts/markdown-test.ts",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -34,7 +36,7 @@
 		"electron-winstaller@5.4.0": true
 	},
 	"license": "GPL-3.0-only",
-	"description": "Edit a TOML file on your machine as a form, without losing its comments.",
+	"description": "Edit a TOML, JSON, JSONC or YAML file on your machine as a form, without losing its comments.",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/wlwatkins/toml-editor"
@@ -107,6 +109,7 @@
 	},
 	"author": "Watkins",
 	"dependencies": {
-		"electron-updater": "^6.8.9"
+		"electron-updater": "^6.8.9",
+		"yaml": "^2.9.1"
 	}
 }

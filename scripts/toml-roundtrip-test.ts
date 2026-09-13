@@ -8,10 +8,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import type { ArrayNode, ScalarNode, TomlDocument, ValueNode } from '../src/lib/toml/ast.ts';
+import type { ArrayNode, Document, ScalarNode, ValueNode } from '../src/lib/format/ast.ts';
+import { applyDrafts, makeItem } from '../src/lib/format/edit.ts';
+import { emptyDrafts, type Drafts } from '../src/lib/format/drafts.ts';
 import { parseToml } from '../src/lib/toml/parse.ts';
-import { applyDrafts, makeItem } from '../src/lib/toml/edit.ts';
-import { emptyDrafts, type Drafts } from '../src/lib/toml/serialize.ts';
+import { toml } from '../src/lib/toml/serialize.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise to LF: core.autocrlf checks the fixture out with CRLF on Windows,
@@ -34,7 +35,7 @@ function check(label: string, actual: unknown, expected: unknown) {
 	}
 }
 
-function findEntry(doc: TomlDocument, path: string) {
+function findEntry(doc: Document, path: string) {
 	for (const table of doc.tables) {
 		for (const entry of table.entries) {
 			if (entry.path.join('.') === path) return entry;
@@ -138,12 +139,12 @@ check(
 
 // ---- round trip -----------------------------------------------------------
 
-check('no drafts rewrites nothing', applyDrafts(doc, emptyDrafts()), sample);
+check('no drafts rewrites nothing', applyDrafts(doc, emptyDrafts(), toml), sample);
 
 function withDraft(mutate: (d: Drafts) => void): string {
 	const drafts = emptyDrafts();
 	mutate(drafts);
-	return applyDrafts(doc, drafts);
+	return applyDrafts(doc, drafts, toml);
 }
 
 // Editing one value must leave the rest of the file byte-identical.
@@ -219,7 +220,7 @@ check(
 
 const crlf = sample.replace(/\n/g, '\r\n');
 const crlfDoc = parseToml(crlf);
-check('CRLF files round-trip unchanged', applyDrafts(crlfDoc, emptyDrafts()), crlf);
+check('CRLF files round-trip unchanged', applyDrafts(crlfDoc, emptyDrafts(), toml), crlf);
 check(
 	'CRLF trailing comments are trimmed',
 	findEntry(crlfDoc, 'server.host').trailingComment,

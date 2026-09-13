@@ -41,7 +41,7 @@
 		<span class="logo" aria-hidden="true">T</span>
 		<div class="names">
 			<h2>TOML Editor</h2>
-			<p>Edit a TOML file as a form, without losing its comments.</p>
+			<p>Edit a TOML, JSON, JSONC or YAML file as a form, without losing its comments.</p>
 		</div>
 	</div>
 

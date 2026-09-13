@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Entry } from '$lib/toml/ast';
-	import { typeLabel } from '$lib/toml/ast';
+	import type { Entry } from '$lib/format/ast';
+	import { typeLabel } from '$lib/format/ast';
 	import type { Editor } from '$lib/editor.svelte';
 	import ValueField from './ValueField.svelte';
 	import CommentBlock from './CommentBlock.svelte';
@@ -11,6 +11,8 @@
 
 	// Arrays and inline tables need the full width; scalars sit beside the label.
 	const block = $derived(entry.value.kind === 'array' || entry.value.kind === 'inline-table');
+	// A trailing comment is shown with the marker its own format uses.
+	const marker = $derived(editor.format.commentMarker ?? '#');
 </script>
 
 <div class="entry" class:block>
@@ -29,7 +31,9 @@
 		<div class="value">
 			<ValueField node={entry.value} {editor} />
 			{#if entry.trailingComment && prefs.comments !== 'off'}
-				<p class="trailing">{@html renderInline(entry.trailingComment)}</p>
+				<p class="trailing" style="--marker: '{marker} '">
+					{@html renderInline(entry.trailingComment)}
+				</p>
 			{/if}
 		</div>
 	</div>
@@ -100,7 +104,7 @@
 	}
 
 	.trailing::before {
-		content: '# ';
+		content: var(--marker, '# ');
 		opacity: 0.6;
 	}
 
