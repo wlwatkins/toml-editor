@@ -57,6 +57,11 @@ scalars, flow versus block style, and anchors.
   it belongs to and rendered as Markdown: headings, banners, lists, code, links.
   Long blocks fold to their first line. Nothing is dropped, not even a note
   sitting on its own between blank lines.
+- **Filter as you type.** The **Filter** box under the path bar narrows the form
+  to the fields whose key, value or comment contains what you typed, section
+  outline included. Naming a section keeps all of it. Comments only count while
+  they are being shown -- with **Comments: off** the filter searches keys and
+  values only. `Ctrl+F` jumps to the box, `Esc` empties it.
 - **Saving is surgical.** Comments, key order, blank lines, number formatting,
   quoting style and alignment survive byte for byte.
 - **Validated as you type.** An invalid integer or date is flagged inline and

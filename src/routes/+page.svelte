@@ -3,6 +3,7 @@
 	import { Editor } from '$lib/editor.svelte';
 	import SectionCard from '$lib/components/SectionCard.svelte';
 	import { prefs, type CommentMode } from '$lib/prefs.svelte';
+	import { filterDocument } from '$lib/filter';
 	import {
 		ask,
 		initialFile,
@@ -38,6 +39,30 @@
 	let aboutOpen = $state(false);
 	let convertOpen = $state(false);
 	let view = $state<'form' | 'raw'>('form');
+
+	// Field filter. Comments are only part of the haystack while they are on
+	// screen -- matching on a hidden comment would show a field for a reason the
+	// user cannot see.
+	let query = $state('');
+	let searchEl = $state<HTMLInputElement | null>(null);
+
+	const searchesComments = $derived(!!editor.format.commentMarker && prefs.comments !== 'off');
+
+	const filter = $derived(
+		editor.doc
+			? filterDocument(editor.doc, query, { comments: searchesComments, source: editor })
+			: null
+	);
+
+	const fieldCount = $derived(
+		editor.doc ? editor.doc.tables.reduce((n, table) => n + table.entries.length, 0) : 0
+	);
+
+	// A query left over from the previous file would hide most of the new one.
+	$effect(() => {
+		editor.openPath;
+		query = '';
+	});
 
 	// Asks the server to show this machine's own file dialog. The request stays
 	// open while the dialog is up, so the button reflects that it is waiting.
@@ -203,6 +228,12 @@
 			editor.save();
 			return;
 		}
+		if (mod && event.key.toLowerCase() === 'f' && editor.doc) {
+			event.preventDefault();
+			searchEl?.focus();
+			searchEl?.select();
+			return;
+		}
 		if (!desktop) return;
 
 		if (mod && event.key.toLowerCase() === 'o') {
@@ -313,6 +344,41 @@
 		</div>
 	</div>
 
+	{#if editor.doc}
+		<div class="filter-row">
+			<div class="filter-inner">
+				<span class="filter-label">Filter</span>
+				<input
+					class="filter"
+					type="search"
+					spellcheck="false"
+					autocomplete="off"
+					aria-label="Filter fields"
+					placeholder={searchesComments
+						? 'Text in a key, a value or a comment'
+						: 'Text in a key or a value'}
+					bind:this={searchEl}
+					bind:value={query}
+					onkeydown={(event) => {
+						if (event.key === 'Escape') {
+							event.stopPropagation();
+							query = '';
+						}
+					}}
+				/>
+				{#if query.trim()}
+					<span class="filter-count" aria-live="polite">
+						{filter?.count ?? 0} of {fieldCount}
+					</span>
+					{#if view === 'raw'}
+						<span class="filter-count">form view only</span>
+					{/if}
+					<button type="button" class="ghost" onclick={() => (query = '')}>Clear</button>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	{#if editor.status}
 		<p class="status {editor.status.kind}">{editor.status.text}</p>
 	{/if}
@@ -336,7 +402,7 @@
 				<p class="outline-head">Sections</p>
 				<ul>
 					{#each doc.tables as table, index (table.id)}
-						{#if table.kind !== 'root' || table.entries.length > 0}
+						{#if (table.kind !== 'root' || table.entries.length > 0) && (!filter || filter.tables.has(table.id))}
 							<li style="--indent: {table.kind === 'root' ? 0 : table.path.length - 1}">
 								<a href="#{anchorFor(index)}">
 									{tableLabel(table.path, table.kind, table.index)}
@@ -385,10 +451,23 @@
 				</div>
 
 				{#if view === 'form'}
+					{#if filter && filter.tables.size === 0}
+						<p class="no-matches">
+							Nothing here contains <strong>{query.trim()}</strong>.
+							{#if !searchesComments}
+								Comments are hidden, so they are not being searched.
+							{/if}
+						</p>
+					{/if}
 					<div class="sections">
 						{#each doc.tables as table, index (table.id)}
-							{#if table.kind !== 'root' || table.entries.length > 0}
-								<SectionCard {table} {editor} anchor={anchorFor(index)} />
+							{#if (table.kind !== 'root' || table.entries.length > 0) && (!filter || filter.tables.has(table.id))}
+								<SectionCard
+									{table}
+									{editor}
+									anchor={anchorFor(index)}
+									visible={filter?.entries ?? null}
+								/>
 							{/if}
 						{/each}
 					</div>
@@ -510,6 +589,72 @@
 		outline: none;
 		border-color: var(--accent);
 		box-shadow: inset 0 0 0 2px var(--accent-soft);
+	}
+
+	/* Its own row under the path bar: the bar is already full, and the filter
+	   belongs with the content it filters rather than with the file actions. */
+	.filter-row {
+		border-top: 1px solid var(--border-faint);
+	}
+
+	.filter-inner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		max-width: 1180px;
+		margin: 0 auto;
+		padding: 0.4rem 1.25rem 0.5rem;
+	}
+
+	.filter-label {
+		flex: none;
+		color: var(--fg-faint);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.filter-inner input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.3rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-control);
+		background: var(--surface-sunken);
+		color: var(--fg);
+		font-size: 0.8rem;
+	}
+
+	/* Inset, like every other control in the chrome. */
+	.filter-inner input:focus-visible {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: inset 0 0 0 2px var(--accent-soft);
+	}
+
+	/* There is a Clear button beside it; the native one is unstyleable. */
+	.filter-inner input::-webkit-search-cancel-button {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.filter-count {
+		flex: none;
+		color: var(--fg-faint);
+		font-size: 0.75rem;
+		white-space: nowrap;
+	}
+
+	.no-matches {
+		margin: 0 0 0.9rem;
+		color: var(--fg-muted);
+		font-size: 0.88rem;
+	}
+
+	.no-matches strong {
+		color: var(--accent);
+		font-family: var(--mono);
+		font-weight: 600;
 	}
 
 	.actions {

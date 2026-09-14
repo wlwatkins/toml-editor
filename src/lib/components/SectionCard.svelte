@@ -4,7 +4,23 @@
 	import EntryRow from './EntryRow.svelte';
 	import CommentBlock from './CommentBlock.svelte';
 
-	let { table, editor, anchor }: { table: TableNode; editor: Editor; anchor: string } = $props();
+	let {
+		table,
+		editor,
+		anchor,
+		visible = null
+	}: {
+		table: TableNode;
+		editor: Editor;
+		anchor: string;
+		/** Entry ids the filter kept, or null when no filter is running. */
+		visible?: Set<number> | null;
+	} = $props();
+
+	const entries = $derived.by(() => {
+		const keep = visible;
+		return keep ? table.entries.filter((entry) => keep.has(entry.id)) : table.entries;
+	});
 
 	const title = $derived(table.kind === 'root' ? 'Top level' : table.path.join('.'));
 	// Nested tables sit slightly inside their parent to mirror the file's shape.
@@ -45,11 +61,11 @@
 		{/if}
 	</header>
 
-	{#if table.entries.length === 0}
+	{#if entries.length === 0}
 		<p class="empty">No keys in this section.</p>
 	{:else}
 		<div class="entries">
-			{#each table.entries as entry (entry.id)}
+			{#each entries as entry (entry.id)}
 				<EntryRow {entry} {editor} />
 			{/each}
 		</div>
